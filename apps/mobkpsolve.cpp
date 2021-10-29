@@ -1,4 +1,5 @@
 #include <mobkp/anytime_trace.hpp>
+#include <mobkp/dp.hpp>
 #include <mobkp/pls.hpp>
 #include <mobkp/problem.hpp>
 #include <mobkp/solution.hpp>
@@ -62,6 +63,12 @@ int main(int argc, char** argv) {
     queue.push(*solutions.begin());
 
     mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
+  } else if (algorithm == "nemull-dp") {
+    solutions = mobkp::nemull_dp<solution_type>(problem, anytime_trace, timeout);
+  } else if (algorithm == "bhv-dp") {
+    solutions = mobkp::bhv_dp<solution_type>(problem, anytime_trace, timeout);
+  } else if (algorithm == "anytime-dp") {
+    solutions = mobkp::anytime_dp<solution_type>(problem, anytime_trace, timeout);
   } else {
     fmt::print("Error: unknown algorithm.\n");
     return EXIT_FAILURE;
@@ -81,6 +88,29 @@ int main(int argc, char** argv) {
   }
   anytime_stream.close();
 
+  // Before printing the solutions we sort them by objective vector/constraint
+  // vector/decision_vector
+  std::sort(solutions.begin(), solutions.end(), [](auto const& lhs, auto const& rhs) {
+    if (lhs.objective_vector() < rhs.objective_vector()) {
+      return true;
+    }
+    if (lhs.objective_vector() > rhs.objective_vector()) {
+      return false;
+    }
+    if (lhs.constraint_vector() < rhs.constraint_vector()) {
+      return true;
+    }
+    if (lhs.constraint_vector() > rhs.constraint_vector()) {
+      return false;
+    }
+    if (lhs.decision_vector() < rhs.decision_vector()) {
+      return true;
+    }
+    if (lhs.decision_vector() > rhs.decision_vector()) {
+      return false;
+    }
+    return false;
+  });
   auto solution_stream = std::ofstream(outdir / "solutions.dat");
   for (auto const& s : solutions) {
     fmt::print(solution_stream, "{} ", fmt::join(s.objective_vector(), " "));

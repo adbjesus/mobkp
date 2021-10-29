@@ -107,7 +107,7 @@ class problem {
 
   // Get the value of weight capacity $i$.
   [[nodiscard]] constexpr auto weight_capacity(size_type i) const {
-    return *capacities_it(i);
+    return *weight_capacity_it(i);
   }
 
   [[nodiscard]] constexpr auto weight_capacities() const {

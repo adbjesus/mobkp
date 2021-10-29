@@ -36,11 +36,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1635244744,
-        "narHash": "sha256-N+0pRQJQfRDNlqZinQEYgPuxbCjFi9V/DUEmspdc+VU=",
+        "lastModified": 1635415069,
+        "narHash": "sha256-J7mdtjAXIyEFmqnWdZOAuNXVgHeBYlsxuEQzfdKUPgk=",
         "ref": "master",
-        "rev": "520fc2e4b041545c2834a33f8745ef17187bbf0d",
-        "revCount": 27,
+        "rev": "8ec8f4d0730eab8454ad8f0dcab261c68bbde563",
+        "revCount": 28,
         "type": "git",
         "url": "ssh://git@git.adbjesus.com/mooutils"
       },
@@ -67,11 +67,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1635242941,
-        "narHash": "sha256-eNvsW31ASathr3GbGGE6BKyBjsIFYT6h5pBa1Zi9lt4=",
+        "lastModified": 1635414680,
+        "narHash": "sha256-NVircjqmJRK1Lg/CMlRiUzIyqG+1qqcSucWAWWVMJfo=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "c7c01d3c63c2f2a5bc97e412c73d9949b73cb80c",
+        "rev": "7f3494b3436bbedf8bb9cfe157871e8c1d398225",
         "type": "github"
       },
       "original": {

@@ -293,6 +293,10 @@ class solution {
     return true;
   }
 
+  [[nodiscard]] constexpr auto problem() const {
+    return m_problem;
+  }
+
   [[nodiscard]] constexpr auto operator==(solution const &other) const {
     return std::ranges::equal(decision_vector(), other.decision_vector());
   }

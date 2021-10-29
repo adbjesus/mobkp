@@ -26,8 +26,9 @@ class anytime_trace {
 
   template <typename Solution>
   auto add_solution(iteration_type const& iteration, Solution&& solution) {
-    m_qi.insert(solution.objective_vector());
-    m_measures.emplace_back(elapsed(), iteration, m_qi.value());
+    if (m_qi.insert(solution.objective_vector()) > 0) {
+      m_measures.emplace_back(elapsed(), iteration, m_qi.value());
+    }
   }
 
   auto elapsed() -> duration_type {

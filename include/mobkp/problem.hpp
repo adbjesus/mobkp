@@ -1,10 +1,10 @@
-#pragma once
+#ifndef MOBKP_PROBLEM_HPP_
+#define MOBKP_PROBLEM_HPP_
 
 #include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <iterator>
-#include <ranges>
 #include <span>
 #include <vector>
 
@@ -77,7 +77,7 @@ class problem {
   }
 
   [[nodiscard]] constexpr auto item_weights(size_type i) const {
-    return std::span(item_weight_it(i, 0), this->m_nc);
+    return std::span(item_weight_it(i, 0), m_nc);
   }
 
   // Get an iterator to value $j$ of item $i$.
@@ -96,7 +96,7 @@ class problem {
   }
 
   [[nodiscard]] constexpr auto item_values(size_type i) const {
-    return std::span(item_value_it(i, 0), this->m_no);
+    return std::span(item_value_it(i, 0), m_no);
   }
 
   // Get an iterator to weight capacity $i$.
@@ -115,10 +115,12 @@ class problem {
   }
 
  private:
-  size_type m_ni;         // number of items
-  size_type m_no;         // number of values per item
-  size_type m_nc;         // number of constraints per item
-  container_type m_data;  // data container (constraints, and items)
+  const size_type m_ni;         // number of items
+  const size_type m_no;         // number of values per item
+  const size_type m_nc;         // number of constraints per item
+  const container_type m_data;  // data container (constraints, and items)
 };
 
 }  // namespace mobkp
+
+#endif

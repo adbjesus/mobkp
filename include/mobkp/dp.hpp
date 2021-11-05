@@ -1,6 +1,7 @@
-#pragma once
+#ifndef MOBKP_DP_HPP_
+#define MOBKP_DP_HPP_
 
-#include <mobkp/problem.hpp>
+#include "anytime_trace.hpp"
 
 #include <fmt/core.h>
 #include <fmt/ostream.h>
@@ -348,6 +349,149 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 }
 
 template <typename Solution, typename Problem, typename AnytimeTrace>
+[[nodiscard]] constexpr auto fpsv_dp(Problem const& problem, AnytimeTrace& anytime_trace,
+                                     double const timeout) {
+  using solution_type = Solution;
+
+  auto elapsed_sec = [&anytime_trace]() {
+    return std::chrono::duration<double>(anytime_trace.elapsed()).count();
+  };
+
+  auto remove_from_order = [](auto& order, size_t i) {
+    std::erase(order, i);
+  };
+
+  auto remove_from_orders = [](auto& orders, size_t i) {
+    for (auto& ord : orders) {
+      std::erase(ord, i);
+    }
+  };
+
+  if (problem.num_objectives() > 2) {
+    throw("FPSV-DP not implemented for more than 2 objectives");
+  }
+
+  auto lb = mooutils::set<solution_type>();
+  // auto fk_at = fake_anytime_trace();
+  for (auto&& s : dws<solution_type>(problem, anytime_trace, timeout)) {
+    lb.insert_unchecked(std::move(s));
+  }
+
+  std::vector<std::vector<size_t>> orders(problem.num_objectives());
+  for (size_t i = 0; i < problem.num_objectives(); ++i) {
+    for (size_t j = 0; j < problem.num_items(); ++j) {
+      orders[i].push_back(j);
+    }
+    std::sort(orders[i].begin(), orders[i].end(), [&problem, i](auto const& lhs, auto const& rhs) {
+      auto r1 = problem.item_value(lhs, i) * problem.item_weight(rhs, 0);
+      auto r2 = problem.item_value(rhs, i) * problem.item_weight(lhs, 0);
+      if (r1 > r2) {
+        return true;
+      } else if (r1 == r2 && problem.item_value(lhs, i) < problem.item_value(rhs, i)) {
+        return true;
+      }
+      return false;
+    });
+  }
+  // Ranking order: Osum, Omax
+  std::vector<size_t> rank_sum(problem.num_items(), 0);
+  std::vector<size_t> rank_max(problem.num_items(), 0);
+  for (size_t i = 0; i < problem.num_objectives(); ++i) {
+    for (size_t j = 0; j < problem.num_items(); ++j) {
+      rank_sum[orders[i][j]] += j + 1;
+      rank_max[orders[i][j]] = std::max(rank_max[orders[i][j]], j + 1);
+    }
+  }
+  std::vector<size_t> order_sum(problem.num_items());
+  std::vector<size_t> order_max(problem.num_items());
+  for (size_t j = 0; j < problem.num_items(); ++j) {
+    order_sum[j] = j;
+    order_max[j] = j;
+  }
+  std::sort(order_sum.begin(), order_sum.end(), [&rank_sum](auto const& lhs, auto const& rhs) {
+    return rank_sum[lhs] < rank_sum[rhs];
+  });
+  std::sort(order_max.begin(), order_max.end(),
+            [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
+              return rank_max[lhs] < rank_max[rhs] ||
+                     (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
+            });
+  std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
+
+  auto sols = std::vector<solution_type>{solution_type::empty(problem)};
+  if (lb.insert(*sols.begin()) != lb.end())
+    anytime_trace.add_solution(0, *sols.begin());
+
+  auto const& pc = problem.weight_capacities();
+  auto rw = std::vector<typename Problem::data_type>(problem.num_constraints(), 0);
+  for (size_t i = 0; i < problem.num_items(); ++i) {
+    auto rwiter = rw.begin();
+    auto rwlast = rw.end();
+    auto iciter = problem.item_weights(i).begin();
+    for (; rwiter != rwlast; ++rwiter, ++iciter) {
+      *rwiter += *iciter;
+    }
+  }
+
+  for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
+    std::cerr << ind << " " << sols.size() << "\n";
+    auto i = sorted_items[ind];
+    remove_from_orders(orders, i);
+    remove_from_order(order_sum, i);
+    remove_from_order(order_max, i);
+
+    auto aux = std::vector<solution_type>{};
+    aux.reserve(sols.size() * 2);
+    auto M = mooutils::set<solution_type>{};
+
+    size_t j = 0;
+    size_t k = 0;
+    for (; k < sols.size() && sols[k].constraint_vector()[0] + rw[0] <= pc[0]; ++k)
+      ;
+    for (; j < sols.size() && sols[j].flip_to_one_feasible(i); ++j) {
+      auto tmp = sols[j];
+      tmp.flip_to_one_unchecked(i);
+      for (; k < sols.size() && dpdetails::lex_ge(sols[k], tmp); ++k) {
+        if (j < k) {
+          dpdetails::mantain_non_dominated(sols[k], M, aux);
+        } else {
+          dpdetails::mantain_non_dominated(std::move(sols[k]), M, aux);
+        }
+      }
+      if (lb.insert(tmp) != lb.end())
+        anytime_trace.add_solution(0, tmp);
+      dpdetails::mantain_non_dominated(std::move(tmp), M, aux);
+    }
+    for (; k < sols.size(); ++k) {
+      dpdetails::mantain_non_dominated(std::move(sols[k]), M, aux);
+    }
+
+    // Dom3 - BDP-1 variant
+    for (auto it = aux.begin(); it != aux.end(); ++it) {
+      if (!mooutils::strictly_dominates(lb, dpdetails::upper_bound(*it, orders))) {
+        sols = decltype(sols)(std::make_move_iterator(it), std::make_move_iterator(aux.end()));
+        break;
+      }
+    }
+
+    // Update rw
+    auto rwiter = rw.begin();
+    auto rwlast = rw.end();
+    auto iciter = problem.item_weights(i).begin();
+    for (; rwiter != rwlast; ++rwiter, ++iciter) {
+      *rwiter -= *iciter;
+    }
+  }
+
+  auto res = mooutils::unordered_set<solution_type>();
+  for (auto&& s : lb)
+    res.insert_unchecked(std::move(s));
+  return res;
+  // return dpdetails::filter_last(std::move(sols));
+  // return lb;
+}
+
+template <typename Solution, typename Problem, typename AnytimeTrace>
 [[nodiscard]] constexpr auto anytime_dp(Problem const& problem, AnytimeTrace& anytime_trace,
                                         double const timeout) {
   using solution_type = Solution;
@@ -365,6 +509,14 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
       std::erase(ord, i);
     }
   };
+
+  auto lb = mooutils::set<solution_type>();
+
+  if (problem.num_objectives() == 2) {
+    for (auto&& s : dws<solution_type>(problem, anytime_trace, timeout)) {
+      lb.insert_unchecked(std::move(s));
+    }
+  }
 
   std::vector<std::vector<size_t>> orders(problem.num_objectives());
   for (size_t i = 0; i < problem.num_objectives(); ++i) {
@@ -409,7 +561,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
   anytime_trace.add_solution(0, *sols.begin());
-  auto lb = mooutils::set<solution_type>();
 
   auto add_to_lb = [&lb, &orders, &order_sum, &order_max, &anytime_trace](auto const& s) {
     for (auto ord : orders) {
@@ -494,10 +645,11 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   }
 
   auto res = mooutils::unordered_set<solution_type>();
-  for (auto& s : lb) {
+  for (auto& s : lb)
     res.insert_unchecked(s);
-  }
   return res;
 }
 
 }  // namespace mobkp
+
+#endif

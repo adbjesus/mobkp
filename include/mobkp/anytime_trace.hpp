@@ -1,6 +1,5 @@
-#pragma once
-
-#include <mooutils/indicators.hpp>
+#ifndef MOBKP_ANYTIME_TRACE_HPP_
+#define MOBKP_ANYTIME_TRACE_HPP_
 
 #include <chrono>
 #include <memory>
@@ -35,6 +34,10 @@ class anytime_trace {
     return clock_type::now() - m_start;
   }
 
+  auto elapsed_sec() -> double {
+    return std::chrono::duration<double>(elapsed()).count();
+  }
+
   auto begin() {
     return m_measures.begin();
   }
@@ -49,4 +52,41 @@ class anytime_trace {
   measures_container_type m_measures;
 };
 
+class fake_anytime_trace {
+ public:
+  using clock_type = std::chrono::high_resolution_clock;
+  using time_point_type = std::chrono::time_point<clock_type>;
+  using duration_type = std::chrono::nanoseconds;
+  using iteration_type = size_t;
+  using measures_container_type = std::vector<int>;
+
+  fake_anytime_trace() {}
+
+  template <typename Solution>
+  auto add_solution([[maybe_unused]] iteration_type const& iteration,
+                    [[maybe_unused]] Solution&& solution) {}
+
+  auto elapsed() -> duration_type {
+    return clock_type::now() - m_start;
+  }
+
+  auto elapsed_sec() -> double {
+    return std::chrono::duration<double>(elapsed()).count();
+  }
+
+  auto begin() {
+    return m_measures.begin();
+  }
+
+  auto end() {
+    return m_measures.end();
+  }
+
+ private:
+  time_point_type m_start;
+  measures_container_type m_measures;
+};
+
 }  // namespace mobkp
+
+#endif

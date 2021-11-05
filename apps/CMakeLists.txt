@@ -1,5 +1,5 @@
 find_package(fmt REQUIRED)
-find_package(CLI11 REQUIRED)
+# find_package(CLI11 REQUIRED)
 find_package(Boost REQUIRED)
 
 add_executable(mobkpsolve mobkpsolve.cpp)

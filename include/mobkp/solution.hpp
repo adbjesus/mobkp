@@ -1,6 +1,9 @@
-#pragma once
+#ifndef MOBKP_SOLUTION_HPP_
+#define MOBKP_SOLUTION_HPP_
 
-#include <vector>
+#include <algorithm>
+#include <functional>
+#include <utility>
 
 namespace mobkp {
 
@@ -8,10 +11,12 @@ template <typename Problem, typename DVec, typename CVec, typename OVec>
 class solution {
  public:
   using problem_type = Problem;
-  using data_type = typename Problem::data_type;
   using decision_vector_type = DVec;
+  using decision_vector_size_type = typename decision_vector_type::size_type;
   using objective_vector_type = CVec;
+  using objective_vector_size_type = typename objective_vector_type::size_type;
   using constraint_vector_type = OVec;
+  using constraint_vector_size_type = typename constraint_vector_type::size_type;
 
   solution(problem_type const &problem, decision_vector_type &&dvec, objective_vector_type &&ovec,
            constraint_vector_type &&cvec)
@@ -62,7 +67,7 @@ class solution {
    * adds this item to the knapsack. If the decision variable is already
    * 1, then this function does nothing.
    */
-  constexpr auto flip_to_one(size_t i) {
+  constexpr auto flip_to_one(decision_vector_size_type i) {
     if (!m_dvec[i]) {
       this->flip_to_one_unchecked(i);
     }
@@ -76,7 +81,7 @@ class solution {
    *
    * Undefined behavior if the decision variable value is already 1.
    */
-  constexpr auto flip_to_one_unchecked(size_t i) {
+  constexpr auto flip_to_one_unchecked(decision_vector_size_type i) {
     m_dvec[i] = 1;
     std::transform(m_ovec.begin(), m_ovec.end(), m_problem.get().item_values(i).begin(),
                    m_ovec.begin(), std::plus<>{});
@@ -89,7 +94,7 @@ class solution {
    * feasible solution. If the decision variable is already 1, returns
    * whether the current solution is feasible.
    */
-  [[nodiscard]] constexpr auto flip_to_one_feasible(size_t i) const {
+  [[nodiscard]] constexpr auto flip_to_one_feasible(decision_vector_size_type i) const {
     if (m_dvec[i]) {
       return this->feasible();
     } else {
@@ -104,7 +109,7 @@ class solution {
    *
    * Undefined behavior if the decision variable is already 1.
    */
-  [[nodiscard]] constexpr auto flip_to_one_feasible_unchecked(size_t i) const {
+  [[nodiscard]] constexpr auto flip_to_one_feasible_unchecked(decision_vector_size_type i) const {
     auto iter1 = m_cvec.begin();
     auto last1 = m_cvec.end();
     auto iter2 = m_problem.get().item_weights(i).begin();
@@ -122,7 +127,7 @@ class solution {
    * from the knapsack. If the decision variable is already 0, then this
    * function does nothing.
    */
-  constexpr auto flip_to_zero(size_t i) {
+  constexpr auto flip_to_zero(decision_vector_size_type i) {
     if (!m_dvec[i]) {
       this->flip_to_zero_unchecked(i);
     }
@@ -135,7 +140,7 @@ class solution {
    *
    * Undefined behavior if the decision variable value is already 0.
    */
-  constexpr auto flip_to_zero_unchecked(size_t i) {
+  constexpr auto flip_to_zero_unchecked(decision_vector_size_type i) {
     m_dvec[i] = 0;
     std::transform(m_ovec.begin(), m_ovec.end(), m_problem.get().item_values(i).begin(),
                    m_ovec.begin(), std::minus<>{});
@@ -148,7 +153,7 @@ class solution {
    * feasible solution. If the decision variable is already 0, returns
    * whether the current solution is feasible.
    */
-  [[nodiscard]] constexpr auto flip_to_zero_feasible(size_t i) const {
+  [[nodiscard]] constexpr auto flip_to_zero_feasible(decision_vector_size_type i) const {
     if (m_dvec[i]) {
       return this->feasible();
     } else {
@@ -163,7 +168,7 @@ class solution {
    *
    * Undefined behavior if the decision variable is already 0.
    */
-  [[nodiscard]] constexpr auto flip_to_zero_feasible_unchecked(size_t i) const {
+  [[nodiscard]] constexpr auto flip_to_zero_feasible_unchecked(decision_vector_size_type i) const {
     auto iter1 = m_cvec.begin();
     auto last1 = m_cvec.end();
     auto iter2 = m_problem.get().item_weights(i).begin();
@@ -181,7 +186,7 @@ class solution {
    *
    * @param i index of the variable
    */
-  constexpr auto flip(size_t i) {
+  constexpr auto flip(decision_vector_size_type i) {
     if (this->m_dvec[i]) {
       this->flip_to_zero_unchecked(i);
     } else {
@@ -196,7 +201,7 @@ class solution {
    * @param i index of the variable.
    * @return true if the resulting solution is feasible, false otherwise.
    */
-  [[nodiscard]] constexpr auto flip_feasible(size_t i) const {
+  [[nodiscard]] constexpr auto flip_feasible(decision_vector_size_type i) const {
     if (this->m_dvec[i]) {
       return this->flip_to_one_feasible_unchecked(i);
     } else {
@@ -212,7 +217,7 @@ class solution {
    * @param i index to the first decision variable
    * @param j index to the second decision variable
    */
-  constexpr auto exchange(size_t i, size_t j) {
+  constexpr auto exchange(decision_vector_size_type i, decision_vector_size_type j) {
     if (m_dvec[i] != m_dvec[j]) {
       this->exchange_unchecked(i, j);
     }
@@ -226,7 +231,7 @@ class solution {
    * @param i index to the first decision variable
    * @param j index to the second decision variable
    */
-  constexpr auto exchange_unchecked(size_t i, size_t j) {
+  constexpr auto exchange_unchecked(decision_vector_size_type i, decision_vector_size_type j) {
     if (m_dvec[i]) {
       this->flip_to_zero_unchecked(i);
       this->flip_to_one_unchecked(j);
@@ -249,7 +254,8 @@ class solution {
    * @param j index of the second variable to be exchanged
    * @return true if resulting solution is feasible, false otherwise
    */
-  [[nodiscard]] constexpr auto exchange_feasible_unchecked(size_t i, size_t j) const {
+  [[nodiscard]] constexpr auto exchange_feasible_unchecked(decision_vector_size_type i,
+                                                           decision_vector_size_type j) const {
     auto iter1 = m_cvec.begin();
     auto last1 = m_cvec.end();
     auto iter2 = m_problem.get().item_weights(i).begin();
@@ -298,7 +304,7 @@ class solution {
   }
 
   [[nodiscard]] constexpr auto operator==(solution const &other) const {
-    return std::ranges::equal(decision_vector(), other.decision_vector());
+    return decision_vector() == other.decision_vector();
   }
 
  private:
@@ -309,3 +315,5 @@ class solution {
 };
 
 }  // namespace mobkp
+
+#endif

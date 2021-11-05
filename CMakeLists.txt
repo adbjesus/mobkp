@@ -72,7 +72,10 @@ if (NOT mooutils_FOUND)
   FetchContent_MakeAvailable(mooutils)
   add_library(mooutils::mooutils ALIAS mooutils)
 endif()
-target_link_libraries(mobkp INTERFACE mooutils::mooutils)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
+find_package(glpk)
+target_link_libraries(mobkp INTERFACE mooutils::mooutils glpk)
 
 # Define solver target
 if(MOBKP_BUILD_APPS)

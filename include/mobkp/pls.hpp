@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MOBKP_PLS_HPP_
+#define MOBKP_PLS_HPP_
 
 #include <mooutils/orders.hpp>
 
@@ -82,3 +83,5 @@ auto flip_exchange_pls(Problem const& problem, Set& solutions, Queue& queue,
 }
 
 }  // namespace mobkp
+
+#endif

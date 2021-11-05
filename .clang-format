@@ -11,9 +11,9 @@ BreakConstructorInitializers: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex:           '^(<|")catch2/'
+  - Regex:           '^<catch2/'
     Priority:        1
-  - Regex:           '^(<|")mobkp/'
+  - Regex:           '^(<mobkp/|")'
     Priority:        2
   - Regex:           '<[[:alnum:]_]+>'
     Priority:        4

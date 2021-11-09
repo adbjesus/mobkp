@@ -1,5 +1,5 @@
-#ifndef MOBKP_WEIGHTED_SUM_H_
-#define MOBKP_WEIGHTED_SUM_H_
+#ifndef MOBKP_SCALARIZATION_HPP_
+#define MOBKP_SCALARIZATION_HPP_
 
 #include "minknap.hpp"
 
@@ -49,9 +49,8 @@ struct epsilon_constraint {
 
     int k = 1;
     for (int i = 0; i < no; ++i) {
-      if (i == o) {
+      if (i == o)
         continue;
-      }
       for (int j = 0; j < ni; ++j) {
         m_ia.push_back(k);
         m_ja.push_back(j + 1);
@@ -91,7 +90,7 @@ struct epsilon_constraint {
 
   template <typename Solution, typename R>
   auto solve(R const& obounds) -> std::optional<Solution> {
-    assert(obounds.size() == m_problem.get().num_objectives());
+    assert(obounds.size() == m_problem.get().num_objectives() - 1);
 
     for (int i = 0; i < static_cast<int>(obounds.size()); ++i) {
       auto bnd = static_cast<double>(obounds[i]);
@@ -338,7 +337,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   return sols;
 }
-
 };  // namespace mobkp
 
-#endif  // WEIGHTED_SUM_H_
+#endif

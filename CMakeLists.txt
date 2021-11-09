@@ -54,14 +54,7 @@ if(MOBKP_NOT_SUBPROJECT)
   include(CTest)
 endif()
 
-# Define library target
-add_library(mobkp INTERFACE)
-target_compile_features(mobkp INTERFACE cxx_std_20)
-target_include_directories(mobkp INTERFACE
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-  )
-
+# Find dependencies
 find_package(mooutils QUIET)
 if (NOT mooutils_FOUND)
   include(FetchContent)
@@ -75,6 +68,14 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
 find_package(glpk)
+
+# Define library target
+add_library(mobkp INTERFACE)
+target_compile_features(mobkp INTERFACE cxx_std_20)
+target_include_directories(mobkp INTERFACE
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  )
 target_link_libraries(mobkp INTERFACE mooutils::mooutils glpk)
 
 # Define solver target

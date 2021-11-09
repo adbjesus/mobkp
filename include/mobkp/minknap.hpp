@@ -1,5 +1,9 @@
-#ifndef MOBKP_MINKNAP_HPP
-#define MOBKP_MINKNAP_HPP
+#ifndef MOBKP_MINKNAP_HPP_
+#define MOBKP_MINKNAP_HPP_
+
+/* This is a slight adaptation of the minknap.c code for use in C++. The
+ * original notice for the code can be found next.
+ */
 
 /* ======================================================================
            MINKNAP.C, David Pisinger   march 1993, revised feb. 1998
@@ -98,8 +102,7 @@
 #define MOBKP_MINKNAP_PMIN 0                   /* profit of worlds least efficient item */
 #define MOBKP_MINKNAP_WMIN 1                   /* weight of worlds least efficient item */
 
-#define MOBKP_MINKNAP_DET(a1, a2, b1, b2) \
-  ((a1) * static_cast<ptype>(b2) - (a2) * static_cast<ptype>(b1))
+#define MOBKP_MINKNAP_DET(a1, a2, b1, b2) ((a1) * static_cast<ptype>(b2) - (a2) * static_cast<ptype>(b1))
 #define MOBKP_MINKNAP_SWAP(a, b) \
   {                              \
     item t;                      \

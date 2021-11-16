@@ -67,7 +67,9 @@ if (NOT mooutils_FOUND)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
-find_package(glpk)
+find_package(glpk REQUIRED)
+
+find_package(Boost REQUIRED)
 
 # Define library target
 add_library(mobkp INTERFACE)
@@ -76,7 +78,7 @@ target_include_directories(mobkp INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   )
-target_link_libraries(mobkp INTERFACE mooutils::mooutils glpk)
+target_link_libraries(mobkp INTERFACE mooutils::mooutils glpk Boost::headers)
 
 # Define solver target
 if(MOBKP_BUILD_APPS)

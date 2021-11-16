@@ -48,8 +48,8 @@ int main(int argc, char** argv) {
   auto const no = problem.num_objectives();
   // auto const nc = problem.num_constraints();
 
-  auto anytime_trace =
-      mobkp::anytime_trace(mooutils::incremental_hv<hv_data_type, ovec_type>(ovec_type(no, -1)));
+  auto hvref = ovec_type(no, -1);
+  auto anytime_trace = mobkp::anytime_trace(mooutils::incremental_hv<hv_data_type, ovec_type>(hvref));
 
   auto solutions = mooutils::unordered_set<solution_type>();
 
@@ -76,6 +76,10 @@ int main(int argc, char** argv) {
     solutions = mobkp::dws<solution_type>(problem, anytime_trace, timeout);
   } else if (algorithm == "aeps") {
     solutions = mobkp::aeps<solution_type>(problem, anytime_trace, timeout);
+  } else if (algorithm == "anytime-eps") {
+    // TODO Make this a parameter
+    size_t l = 100;
+    solutions = mobkp::anytime_eps<solution_type>(problem, l, hvref, anytime_trace, timeout);
   } else {
     fmt::print("Error: unknown algorithm.\n");
     return EXIT_FAILURE;

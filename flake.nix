@@ -5,9 +5,10 @@
     nixpkgs.url = "github:nixos/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     mooutils.url = "git+ssh://git@git.adbjesus.com/mooutils";
+    apm.url = "git+ssh://git@github.com/adbjesus/apm";
   };
 
-  outputs = { self, nixpkgs, flake-utils, mooutils }:
+  outputs = { self, nixpkgs, flake-utils, mooutils, apm }:
     flake-utils.lib.eachDefaultSystem (system:
       let pkgs = nixpkgs.legacyPackages.${system};
       in rec {
@@ -23,6 +24,7 @@
             pkgs.cli11
             pkgs.boost175
             mooutils.packages.${system}.mooutils
+            apm.packages.${system}.apm
           ];
         };
         defaultPackage = self.packages.${system}.mobkp;

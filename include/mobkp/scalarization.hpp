@@ -3,6 +3,8 @@
 
 #include "minknap.hpp"
 
+#include <apm/apm.hpp>
+#include <boost/icl/interval_set.hpp>
 #include <glpk.h>
 #include <mooutils/sets.hpp>
 
@@ -337,6 +339,96 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   return sols;
 }
-};  // namespace mobkp
+
+template <typename Solution, typename Problem, typename HvRef, typename AnytimeTrace>
+[[nodiscard]] auto anytime_eps(Problem const& problem, size_t l, HvRef const& hvref, AnytimeTrace& anytime_trace,
+                               double timeout) {
+  using solution_type = Solution;
+  using value_type = solution_type::objective_vector_type::value_type;
+
+  if (problem.num_objectives() > 2) {
+    throw("Anytime-EPS algorithm is only implemented for 2 objectives");
+  }
+
+  auto sols = mooutils::unordered_set<solution_type>();
+
+  // auto solver = weighted_sum(problem);
+  auto solver = minknap_solver(problem);
+  auto solver0 = epsilon_constraint(problem, 0);
+  auto solver1 = epsilon_constraint(problem, 1);
+
+  // lexmax0
+  auto aux0 = solver.template solve<solution_type>(std::array{1, 0});
+  if (!aux0.has_value())
+    return sols;
+  auto ov0 = std::array{aux0.value().objective_vector()[0], aux0.value().objective_vector()[1]};
+  anytime_trace.add_solution(1, aux0.value());
+  sols.insert_unchecked(std::move(aux0.value()));
+
+  // lexmax1
+  auto aux1 = solver.template solve<solution_type>(std::array{0, 1});
+  if (!aux1.has_value())
+    return sols;
+  auto ov1 = std::array{aux1.value().objective_vector()[0], aux1.value().objective_vector()[1]};
+  anytime_trace.add_solution(2, aux1.value());
+  sols.insert_unchecked(std::move(aux1.value()));
+
+  if (sols.size() < 2)
+    return sols;
+
+  // Find middle (according to weighted sum) point
+  auto l1 = ov1[1] - ov0[1];
+  auto l2 = ov0[0] - ov1[0];
+
+  auto aux = solver.template solve<solution_type>(std::array{l1, l2});
+  if (!aux.has_value())
+    return sols;
+
+  auto ov = std::array{aux.value().objective_vector()[0], aux.value().objective_vector()[1]};
+  if (ov == ov0 || ov == ov1)
+    return sols;
+
+  anytime_trace.add_solution(3, aux.value());
+  sols.insert_unchecked(std::move(aux.value()));
+
+  // Compute p, d, and reference point r (assuming scalarization to [0-1]^2)
+  auto denom0 = ov0[0] - ov1[0];
+  auto denom1 = ov1[1] - ov0[1];
+  auto p0 = static_cast<double>(ov[0] - ov1[0]) / static_cast<double>(denom0);
+  auto p1 = static_cast<double>(ov[1] - ov0[1]) / static_cast<double>(denom1);
+  auto d = std::log(0.5) / std::log((p0 + p1) / 2.0);
+  auto r0 = static_cast<double>(hvref[0] - ov1[0]) / static_cast<double>(denom0);
+  auto r1 = static_cast<double>(hvref[1] - ov0[1]) / static_cast<double>(denom1);
+
+  // Get segments
+  auto segments = apm::piecewise_segments(l, d);
+
+  // Get model
+  auto model = apm::greedy_model(segments, {r0, r1});
+  auto iter = model.begin();
+  auto last = model.end();
+
+  // Interval set
+  auto interval_set = boost::icl::interval_set<value_type>();
+
+  for (size_t i = 4; iter != last && anytime_trace.elapsed_sec() < timeout; ++iter, ++i) {
+    auto eps = static_cast<value_type>((*iter).first.y * static_cast<double>(denom1)) + ov0[1] + 1;
+    if (boost::icl::contains(interval_set, eps))
+      continue;
+    aux = solver0.template solve<solution_type>(std::array{eps});
+    if (!aux.has_value())
+      continue;
+    aux = solver1.template solve<solution_type>(std::array{aux->objective_vector()[0]});
+    if (!aux.has_value())
+      continue;
+    interval_set.add(boost::icl::interval<value_type>::closed(eps, aux->objective_vector()[1]));
+    anytime_trace.add_solution(i, *aux);
+    sols.insert(std::move(*aux));
+  }
+
+  return sols;
+}
+
+}  // namespace mobkp
 
 #endif

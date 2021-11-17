@@ -75,7 +75,19 @@ endif()
 
 # Find dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
-find_package(mooutils REQUIRED)
+
+find_package(mooutils QUIET)
+# If mooutils not found fallback to github
+if (NOT mooutils_FOUND)
+  include(FetchContent)
+  FetchContent_Declare(
+    mooutils
+    GIT_REPOSITORY git@git.adbjesus.com:mooutils.git
+  )
+  FetchContent_MakeAvailable(mooutils)
+  add_library(mooutils::mooutils ALIAS mooutils)
+endif()
+
 find_package(glpk REQUIRED)
 find_package(Boost REQUIRED)
 

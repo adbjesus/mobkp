@@ -88,6 +88,18 @@ if (NOT mooutils_FOUND)
   add_library(mooutils::mooutils ALIAS mooutils)
 endif()
 
+find_package(apm QUIET)
+# If mooutils not found fallback to github
+if (NOT apm_FOUND)
+  include(FetchContent)
+  FetchContent_Declare(
+    apm
+    GIT_REPOSITORY git@github.com:adbjesus/apm.git
+  )
+  FetchContent_MakeAvailable(apm)
+  add_library(apm::apm ALIAS apm)
+endif()
+
 find_package(glpk REQUIRED)
 find_package(Boost REQUIRED)
 
@@ -100,7 +112,7 @@ target_include_directories(mobkp INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-target_link_libraries(mobkp INTERFACE mooutils::mooutils glpk Boost::headers)
+target_link_libraries(mobkp INTERFACE mooutils::mooutils apm::apm glpk Boost::headers)
 
 # The library is an install target
 install(TARGETS mobkp)

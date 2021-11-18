@@ -91,13 +91,14 @@ struct epsilon_constraint {
   }
 
   template <typename Solution, typename R>
-  auto solve(R const& obounds) -> std::optional<Solution> {
+  auto solve(R const& obounds, int tm_lim) -> std::optional<Solution> {
     assert(obounds.size() == m_problem.get().num_objectives() - 1);
 
     for (int i = 0; i < static_cast<int>(obounds.size()); ++i) {
       auto bnd = static_cast<double>(obounds[i]);
       glp_set_row_bnds(m_lp, i + 1, GLP_LO, bnd, 0.0);
     }
+    m_iocp->tm_lim = tm_lim;
 
     if (glp_intopt(m_lp, m_iocp) != 0 || glp_mip_status(m_lp) != GLP_OPT) {
       return {};
@@ -328,13 +329,18 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto solver0 = epsilon_constraint(problem, 0);
   auto solver1 = epsilon_constraint(problem, 1);
 
-  auto aux = solver0.template solve<solution_type>(std::array{0});
+  auto aux = solver0.template solve<solution_type>(std::array{0},
+                                                   static_cast<int>((timeout - anytime_trace.elapsed_sec()) * 1000));
 
   for (size_t i = 1; aux.has_value() && anytime_trace.elapsed_sec() < timeout; ++i) {
-    aux = solver1.template solve<solution_type>(std::array{aux.value().objective_vector()[0]});
+    aux = solver1.template solve<solution_type>(std::array{aux.value().objective_vector()[0]},
+                                                static_cast<int>((timeout - anytime_trace.elapsed_sec()) * 1000));
+    if (!aux.has_value())
+      break;
     anytime_trace.add_solution(i, aux.value());
     sols.insert_unchecked(aux.value());
-    aux = solver0.template solve<solution_type>(std::array{aux.value().objective_vector()[1] + 1});
+    aux = solver0.template solve<solution_type>(std::array{aux.value().objective_vector()[1] + 1},
+                                                static_cast<int>((timeout - anytime_trace.elapsed_sec()) * 1000));
   }
 
   return sols;
@@ -411,14 +417,21 @@ template <typename Solution, typename Problem, typename HvRef, typename AnytimeT
   // Interval set
   auto interval_set = boost::icl::interval_set<value_type>();
 
-  for (size_t i = 4; iter != last && anytime_trace.elapsed_sec() < timeout; ++iter, ++i) {
+  auto skipped = 0;
+  auto skipped_limit = 100000;
+  for (size_t i = 4; iter != last && skipped < skipped_limit && anytime_trace.elapsed_sec() < timeout; ++iter, ++i) {
     auto eps = static_cast<value_type>((*iter).first.y * static_cast<double>(denom1)) + ov0[1] + 1;
-    if (boost::icl::contains(interval_set, eps))
+    if (boost::icl::contains(interval_set, eps)) {
+      ++skipped;
       continue;
-    aux = solver0.template solve<solution_type>(std::array{eps});
+    }
+    skipped = 0;
+    aux = solver0.template solve<solution_type>(std::array{eps},
+                                                static_cast<int>((timeout - anytime_trace.elapsed_sec()) * 1000));
     if (!aux.has_value())
       continue;
-    aux = solver1.template solve<solution_type>(std::array{aux->objective_vector()[0]});
+    aux = solver1.template solve<solution_type>(std::array{aux->objective_vector()[0]},
+                                                static_cast<int>((timeout - anytime_trace.elapsed_sec()) * 1000));
     if (!aux.has_value())
       continue;
     interval_set.add(boost::icl::interval<value_type>::closed(eps, aux->objective_vector()[1]));

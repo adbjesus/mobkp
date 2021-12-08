@@ -196,8 +196,7 @@ auto mantain_non_dominated(S&& s, M& m, C& c) {
 }  // namespace dpdetails
 
 template <typename Solution, typename Problem, typename AnytimeTrace>
-[[nodiscard]] constexpr auto nemull_dp(Problem const& problem, AnytimeTrace& anytime_trace,
-                                       double const timeout) {
+[[nodiscard]] constexpr auto nemull_dp(Problem const& problem, AnytimeTrace& anytime_trace, double const timeout) {
   using solution_type = Solution;
 
   auto elapsed_sec = [&anytime_trace]() {
@@ -208,7 +207,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   size_t iteration = 0;
   for (size_t i = 0; i < problem.num_items() && elapsed_sec() < timeout; ++i) {
-    std::cerr << i << " " << sols.size() << "\n";
+    // std::cerr << i << " " << sols.size() << "\n";
     dpdetails::merge(sols, dpdetails::build_aux(sols, i), anytime_trace, iteration);
   }
 
@@ -216,8 +215,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 }
 
 template <typename Solution, typename Problem, typename AnytimeTrace>
-[[nodiscard]] constexpr auto bhv_dp(Problem const& problem, AnytimeTrace& anytime_trace,
-                                    double const timeout) {
+[[nodiscard]] constexpr auto bhv_dp(Problem const& problem, AnytimeTrace& anytime_trace, double const timeout) {
   using solution_type = Solution;
 
   auto elapsed_sec = [&anytime_trace]() {
@@ -265,14 +263,11 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     order_sum[j] = j;
     order_max[j] = j;
   }
-  std::sort(order_sum.begin(), order_sum.end(), [&rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_sum[lhs] < rank_sum[rhs];
+  std::sort(order_sum.begin(), order_sum.end(),
+            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
+  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
+    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
   });
-  std::sort(order_max.begin(), order_max.end(),
-            [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-              return rank_max[lhs] < rank_max[rhs] ||
-                     (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-            });
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -290,7 +285,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   }
 
   for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
-    std::cerr << ind << " " << sols.size() << "\n";
+    // std::cerr << ind << " " << sols.size() << "\n";
     auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
@@ -349,8 +344,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 }
 
 template <typename Solution, typename Problem, typename AnytimeTrace>
-[[nodiscard]] constexpr auto fpsv_dp(Problem const& problem, AnytimeTrace& anytime_trace,
-                                     double const timeout) {
+[[nodiscard]] constexpr auto fpsv_dp(Problem const& problem, AnytimeTrace& anytime_trace, double const timeout) {
   using solution_type = Solution;
 
   auto elapsed_sec = [&anytime_trace]() {
@@ -408,14 +402,11 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     order_sum[j] = j;
     order_max[j] = j;
   }
-  std::sort(order_sum.begin(), order_sum.end(), [&rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_sum[lhs] < rank_sum[rhs];
+  std::sort(order_sum.begin(), order_sum.end(),
+            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
+  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
+    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
   });
-  std::sort(order_max.begin(), order_max.end(),
-            [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-              return rank_max[lhs] < rank_max[rhs] ||
-                     (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-            });
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -434,7 +425,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   }
 
   for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
-    std::cerr << ind << " " << sols.size() << "\n";
+    // std::cerr << ind << " " << sols.size() << "\n";
     auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
@@ -492,8 +483,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 }
 
 template <typename Solution, typename Problem, typename AnytimeTrace>
-[[nodiscard]] constexpr auto anytime_dp(Problem const& problem, AnytimeTrace& anytime_trace,
-                                        double const timeout) {
+[[nodiscard]] constexpr auto anytime_dp(Problem const& problem, AnytimeTrace& anytime_trace, double const timeout) {
   using solution_type = Solution;
 
   auto elapsed_sec = [&anytime_trace]() {
@@ -549,14 +539,11 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     order_sum[j] = j;
     order_max[j] = j;
   }
-  std::sort(order_sum.begin(), order_sum.end(), [&rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_sum[lhs] < rank_sum[rhs];
+  std::sort(order_sum.begin(), order_sum.end(),
+            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
+  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
+    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
   });
-  std::sort(order_max.begin(), order_max.end(),
-            [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-              return rank_max[lhs] < rank_max[rhs] ||
-                     (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-            });
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -597,7 +584,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   }
 
   for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
-    std::cerr << ind << " " << sols.size() << "\n";
+    // std::cerr << ind << " " << sols.size() << "\n";
     auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);

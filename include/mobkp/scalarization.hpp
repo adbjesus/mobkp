@@ -267,28 +267,35 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto solver0 = epsilon_constraint(problem, 0);
   auto solver1 = epsilon_constraint(problem, 1);
 
+  using data_type = typename solution_type::objective_vector_type::value_type;
+  using ov_type = std::array<data_type, 2>;
+  auto ov0 = ov_type{};
+  auto ov1 = ov_type{};
+
   // lexmax0
   auto aux0 = solver.template solve<solution_type>(std::array{1, 0});
-  if (!aux0.has_value())
-    return sols;
-  // aux0 = solver1.template solve<solution_type>(std::array{aux0.value().objective_vector()[0]});
-  auto ov0 = std::array{aux0.value().objective_vector()[0], aux0.value().objective_vector()[1]};
-  anytime_trace.add_solution(1, aux0.value());
-  sols.insert_unchecked(std::move(aux0.value()));
+  if (aux0.has_value() && aux0->feasible()) {
+    // aux0 = solver1.template solve<solution_type>(std::array{aux0->objective_vector()[0]});
+    ov0[0] = aux0->objective_vector()[0];
+    ov0[1] = aux0->objective_vector()[1];
+    anytime_trace.add_solution(1, *aux0);
+    sols.insert(std::move(*aux0));
+  }
 
   // lexmax1
   auto aux1 = solver.template solve<solution_type>(std::array{0, 1});
-  if (!aux1.has_value())
-    return sols;
-  // aux1 = solver0.template solve<solution_type>(std::array{aux1.value().objective_vector()[1]});
-  auto ov1 = std::array{aux1.value().objective_vector()[0], aux1.value().objective_vector()[1]};
-  anytime_trace.add_solution(2, aux1.value());
-  sols.insert_unchecked(std::move(aux1.value()));
+  if (aux1.has_value() && aux1->feasible()) {
+    // aux1 = solver0.template solve<solution_type>(std::array{aux1->objective_vector()[1]});
+    ov1[0] = aux1->objective_vector()[0];
+    ov1[1] = aux1->objective_vector()[1];
+    anytime_trace.add_solution(2, *aux1);
+    sols.insert(std::move(*aux1));
+  }
 
   if (sols.size() < 2)
     return sols;
 
-  std::queue<std::array<decltype(ov1), 2>> q;
+  std::queue<std::array<ov_type, 2>> q;
   q.push(std::array{ov0, ov1});
 
   for (size_t i = 3; !q.empty() && anytime_trace.elapsed_sec() < timeout; ++i) {
@@ -299,15 +306,17 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     auto l2 = v[0][0] - v[1][0];
 
     auto aux = solver.template solve<solution_type>(std::array{l1, l2});
-    if (!aux.has_value())
+    if (!aux.has_value() || !aux->feasible())
       continue;
 
-    auto ov = std::array{aux.value().objective_vector()[0], aux.value().objective_vector()[1]};
+    auto ov = ov_type{aux->objective_vector()[0], aux->objective_vector()[1]};
     if (ov == v[0] || ov == v[1])
       continue;
 
-    anytime_trace.add_solution(i, aux.value());
-    sols.insert_unchecked(std::move(aux.value()));
+    anytime_trace.add_solution(i, *aux);
+    if (sols.insert(std::move(*aux)) == sols.end()) {
+      continue;
+    }
 
     q.push(std::array{v[0], ov});
     q.push(std::array{ov, v[1]});

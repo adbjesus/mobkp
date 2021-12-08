@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
 
   auto algorithm = std::string(argv[1]);
   auto timeout = std::stod(argv[2]);
-  auto seed = std::stoi(argv[3]);
+  auto seed = std::stoull(argv[3]);
   auto inputfile = argv[4];
   auto outdir = std::filesystem::path(argv[5]);
 

@@ -1,10 +1,14 @@
 #include <mobkp/anytime_trace.hpp>
+#include <mobkp/bb.hpp>
 #include <mobkp/dp.hpp>
 #include <mobkp/pls.hpp>
 #include <mobkp/problem.hpp>
 #include <mobkp/scalarization.hpp>
 #include <mobkp/solution.hpp>
 
+#include <CLI/App.hpp>
+#include <CLI/Config.hpp>
+#include <CLI/Formatter.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <fmt/core.h>
 #include <fmt/ostream.h>
@@ -21,17 +25,39 @@
 #include <string>
 
 int main(int argc, char** argv) {
-  if (argc < 6) {
-    fmt::print("Error: wrong number of arguments.\n");
-    fmt::print("Usage: {} algorithm timeout seed inputfile outdir.\n", argv[0]);
-    return EXIT_FAILURE;
-  }
+  using rng_type = std::mt19937_64;
+  using rng_result_type = typename rng_type::result_type;
 
-  auto algorithm = std::string(argv[1]);
-  auto timeout = std::stod(argv[2]);
-  auto seed = std::stoull(argv[3]);
-  auto inputfile = argv[4];
-  auto outdir = std::filesystem::path(argv[5]);
+  CLI::App app{"Multi-Objective Binary Knapsack Solver"};
+
+  std::string algorithm;
+  app.add_option("-a,--algorithm", algorithm, "Algorithm to use")->required();
+
+  rng_result_type seed;
+  app.add_option("-s,--seed", seed, "Seed for random generator")->required();
+
+  double timeout;
+  app.add_option("-t,--timeout", timeout, "Timeout")->required();
+
+  std::filesystem::path inputfile;
+  app.add_option("-i,--input-file", inputfile, "Input file")->required();
+
+  std::filesystem::path outdir;
+  app.add_option("-o,--output-directory", outdir, "Output directory")->required();
+
+  CLI11_PARSE(app, argc, argv);
+
+  // if (argc < 6) {
+  //   fmt::print("Error: wrong number of arguments.\n");
+  //   fmt::print("Usage: {} algorithm timeout seed inputfile outdir.\n", argv[0]);
+  //   return EXIT_FAILURE;
+  // }
+
+  // auto algorithm = std::string(argv[1]);
+  // auto timeout = std::stod(argv[2]);
+  // auto seed = std::stoull(argv[3]);
+  // auto inputfile = argv[4];
+  // auto outdir = std::filesystem::path(argv[5]);
 
   using data_type = int_fast32_t;
   using dvec_type = std::vector<bool>;
@@ -80,6 +106,14 @@ int main(int argc, char** argv) {
     // TODO Make this a parameter
     size_t l = 100;
     solutions = mobkp::anytime_eps<solution_type>(problem, l, hvref, anytime_trace, timeout);
+  } else if (algorithm == "eager-branch-and-bound-dfs") {
+    // auto queue = mooutils::lifo_queue<solution_type>();
+    // auto sols = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+    // for (auto&& s : sols) {
+    //   solutions.insert_unchecked(std::move(s));
+    // }
+  } else if (algorithm == "eager-branch-and-bound-bfs") {
+  } else if (algorithm == "lazy-branch-and-bound") {
   } else {
     fmt::print("Error: unknown algorithm.\n");
     return EXIT_FAILURE;

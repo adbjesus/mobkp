@@ -1,7 +1,8 @@
 #ifndef MOBKP_DP_HPP_
 #define MOBKP_DP_HPP_
 
-#include "anytime_trace.hpp"
+#include "bounds.hpp"
+#include "orders.hpp"
 
 #include <fmt/core.h>
 #include <fmt/ostream.h>
@@ -122,56 +123,6 @@ template <typename SolutionSet>
   return res;
 }
 
-template <typename Solution, typename Order>
-constexpr auto lower_bound(Solution&& s, Order const& order) {
-  auto lb = std::forward<Solution>(s);
-  for (auto i : order) {
-    if (lb.flip_to_one_feasible(i)) {
-      lb.flip_to_one_unchecked(i);
-    } else {
-      break;
-    }
-  }
-  return lb;
-}
-
-// This gives the Martello and Toth bound or Dantzig's as a fallback
-template <typename Solution, typename Orders>
-[[nodiscard]] constexpr auto upper_bound(Solution const& s, Orders const& orders) {
-  using data_type = typename std::remove_cvref_t<decltype(s.objective_vector())>::value_type;
-  auto ub = std::vector<data_type>(s.objective_vector().size(), 0);
-  for (size_t i = 0; i < ub.size(); ++i) {
-    auto tmp = s;
-    auto rem = data_type(0);
-    for (size_t j = 0; j < orders[i].size(); ++j) {
-      auto k = orders[i][j];
-      if (tmp.flip_to_one_feasible(k)) {
-        tmp.flip_to_one_unchecked(k);
-      } else {
-        // k is the breaking item
-        auto p = tmp.problem();
-        auto vk = p.get().item_value(k, i);
-        auto wk = p.get().item_weight(k, 0);
-        auto remw = p.get().weight_capacity(0) - tmp.constraint_vector()[0];
-        if (j > 0 && j + 1 < orders[i].size()) {
-          // This gives Martello and Toth remainder
-          auto lasti = orders[i][j - 1];
-          auto nexti = orders[i][j + 1];
-          auto b1 = (remw * p.get().item_value(nexti, i)) / p.get().item_weight(nexti, 0);
-          auto b2 = vk + (remw * p.get().item_value(lasti, i)) / p.get().item_weight(lasti, 0);
-          rem = std::max(b1, b2);
-        } else {
-          // This gives Dantzig's remainder
-          rem = (remw * vk) / wk + 1;
-        }
-        break;
-      }
-    }
-    ub[i] = tmp.objective_vector()[i] + rem;
-  }
-  return ub;
-}
-
 [[nodiscard]] constexpr auto lex_ge(auto const& s1, auto const& s2) {
   if (s1.constraint_vector()[0] < s2.constraint_vector()[0]) {
     return true;
@@ -232,42 +183,9 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   };
 
-  std::vector<std::vector<size_t>> orders(problem.num_objectives());
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      orders[i].push_back(j);
-    }
-    std::sort(orders[i].begin(), orders[i].end(), [&problem, i](auto const& lhs, auto const& rhs) {
-      auto r1 = problem.item_value(lhs, i) * problem.item_weight(rhs, 0);
-      auto r2 = problem.item_value(rhs, i) * problem.item_weight(lhs, 0);
-      if (r1 > r2) {
-        return true;
-      } else if (r1 == r2 && problem.item_value(lhs, i) < problem.item_value(rhs, i)) {
-        return true;
-      }
-      return false;
-    });
-  }
-  // Ranking order: Osum, Omax
-  std::vector<size_t> rank_sum(problem.num_items(), 0);
-  std::vector<size_t> rank_max(problem.num_items(), 0);
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      rank_sum[orders[i][j]] += j + 1;
-      rank_max[orders[i][j]] = std::max(rank_max[orders[i][j]], j + 1);
-    }
-  }
-  std::vector<size_t> order_sum(problem.num_items());
-  std::vector<size_t> order_max(problem.num_items());
-  for (size_t j = 0; j < problem.num_items(); ++j) {
-    order_sum[j] = j;
-    order_max[j] = j;
-  }
-  std::sort(order_sum.begin(), order_sum.end(),
-            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
-  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-  });
+  auto orders = mobkp::objectives_orders(problem);
+  auto order_max = mobkp::rank_max_order(problem, orders);
+  auto order_sum = mobkp::rank_sum_order(problem, orders);
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -318,13 +236,13 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
     auto lb = mooutils::set<solution_type>();
     for (auto&& s : M) {
-      lb.insert(dpdetails::lower_bound(s, order_sum));
-      lb.insert(dpdetails::lower_bound(std::move(s), order_max));
+      lb.insert(mobkp::lower_bound(s, order_sum));
+      lb.insert(mobkp::lower_bound(std::move(s), order_max));
     }
 
     // Dom3
     for (auto it = aux.begin(); it != aux.end(); ++it) {
-      if (!mooutils::strictly_dominates(lb, dpdetails::upper_bound(*it, orders))) {
+      if (!mooutils::strictly_dominates(lb, mobkp::upper_bound(*it, orders))) {
         sols = decltype(sols)(std::make_move_iterator(it), std::make_move_iterator(aux.end()));
         break;
       }
@@ -371,42 +289,9 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     lb.insert_unchecked(std::move(s));
   }
 
-  std::vector<std::vector<size_t>> orders(problem.num_objectives());
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      orders[i].push_back(j);
-    }
-    std::sort(orders[i].begin(), orders[i].end(), [&problem, i](auto const& lhs, auto const& rhs) {
-      auto r1 = problem.item_value(lhs, i) * problem.item_weight(rhs, 0);
-      auto r2 = problem.item_value(rhs, i) * problem.item_weight(lhs, 0);
-      if (r1 > r2) {
-        return true;
-      } else if (r1 == r2 && problem.item_value(lhs, i) < problem.item_value(rhs, i)) {
-        return true;
-      }
-      return false;
-    });
-  }
-  // Ranking order: Osum, Omax
-  std::vector<size_t> rank_sum(problem.num_items(), 0);
-  std::vector<size_t> rank_max(problem.num_items(), 0);
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      rank_sum[orders[i][j]] += j + 1;
-      rank_max[orders[i][j]] = std::max(rank_max[orders[i][j]], j + 1);
-    }
-  }
-  std::vector<size_t> order_sum(problem.num_items());
-  std::vector<size_t> order_max(problem.num_items());
-  for (size_t j = 0; j < problem.num_items(); ++j) {
-    order_sum[j] = j;
-    order_max[j] = j;
-  }
-  std::sort(order_sum.begin(), order_sum.end(),
-            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
-  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-  });
+  auto orders = mobkp::objectives_orders(problem);
+  auto order_max = mobkp::rank_max_order(problem, orders);
+  auto order_sum = mobkp::rank_sum_order(problem, orders);
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -459,7 +344,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
     // Dom3 - BDP-1 variant
     for (auto it = aux.begin(); it != aux.end(); ++it) {
-      if (!mooutils::strictly_dominates(lb, dpdetails::upper_bound(*it, orders))) {
+      if (!mooutils::strictly_dominates(lb, mobkp::upper_bound(*it, orders))) {
         sols = decltype(sols)(std::make_move_iterator(it), std::make_move_iterator(aux.end()));
         break;
       }
@@ -508,42 +393,9 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   }
 
-  std::vector<std::vector<size_t>> orders(problem.num_objectives());
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      orders[i].push_back(j);
-    }
-    std::sort(orders[i].begin(), orders[i].end(), [&problem, i](auto const& lhs, auto const& rhs) {
-      auto r1 = problem.item_value(lhs, i) * problem.item_weight(rhs, 0);
-      auto r2 = problem.item_value(rhs, i) * problem.item_weight(lhs, 0);
-      if (r1 > r2) {
-        return true;
-      } else if (r1 == r2 && problem.item_value(lhs, i) < problem.item_value(rhs, i)) {
-        return true;
-      }
-      return false;
-    });
-  }
-  // Ranking order: Osum, Omax
-  std::vector<size_t> rank_sum(problem.num_items(), 0);
-  std::vector<size_t> rank_max(problem.num_items(), 0);
-  for (size_t i = 0; i < problem.num_objectives(); ++i) {
-    for (size_t j = 0; j < problem.num_items(); ++j) {
-      rank_sum[orders[i][j]] += j + 1;
-      rank_max[orders[i][j]] = std::max(rank_max[orders[i][j]], j + 1);
-    }
-  }
-  std::vector<size_t> order_sum(problem.num_items());
-  std::vector<size_t> order_max(problem.num_items());
-  for (size_t j = 0; j < problem.num_items(); ++j) {
-    order_sum[j] = j;
-    order_max[j] = j;
-  }
-  std::sort(order_sum.begin(), order_sum.end(),
-            [&rank_sum](auto const& lhs, auto const& rhs) { return rank_sum[lhs] < rank_sum[rhs]; });
-  std::sort(order_max.begin(), order_max.end(), [&rank_max, &rank_sum](auto const& lhs, auto const& rhs) {
-    return rank_max[lhs] < rank_max[rhs] || (rank_max[lhs] == rank_max[rhs] && rank_sum[lhs] < rank_sum[rhs]);
-  });
+  auto orders = mobkp::objectives_orders(problem);
+  auto order_max = mobkp::rank_max_order(problem, orders);
+  auto order_sum = mobkp::rank_sum_order(problem, orders);
   std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
@@ -551,19 +403,19 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   auto add_to_lb = [&lb, &orders, &order_sum, &order_max, &anytime_trace](auto const& s) {
     for (auto ord : orders) {
-      auto it = lb.insert(dpdetails::lower_bound(s, ord));
+      auto it = lb.insert(mobkp::lower_bound(s, ord));
       if (it != lb.end()) {
         anytime_trace.add_solution(0, *it);
       }
     }
     {
-      auto it = lb.insert(dpdetails::lower_bound(s, order_sum));
+      auto it = lb.insert(mobkp::lower_bound(s, order_sum));
       if (it != lb.end()) {
         anytime_trace.add_solution(0, *it);
       }
     }
     {
-      auto it = lb.insert(dpdetails::lower_bound(s, order_max));
+      auto it = lb.insert(mobkp::lower_bound(s, order_max));
       if (it != lb.end()) {
         anytime_trace.add_solution(0, *it);
       }
@@ -617,7 +469,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
     // Dom3
     auto rend = std::remove_if(aux.begin(), aux.end(), [&lb, &orders](auto const& s) {
-      return mooutils::strictly_dominates(lb, dpdetails::upper_bound(s, orders));
+      return mooutils::strictly_dominates(lb, mobkp::upper_bound(s, orders));
     });
     aux.erase(rend, aux.end());
     sols = std::move(aux);

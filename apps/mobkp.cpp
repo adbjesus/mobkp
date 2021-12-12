@@ -22,18 +22,30 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <string>
 
-int main(int argc, char** argv) {
-  using rng_type = std::mt19937_64;
-  using rng_result_type = typename rng_type::result_type;
+enum class queue_type {
+  FIFO,
+  LIFO,
+  Random,
+};
 
+enum class problem_order {
+  Default,
+  Random,
+  RankMin,
+  RankMax,
+  RankSum,
+};
+
+int main(int argc, char** argv) {
   CLI::App app{"Multi-Objective Binary Knapsack Solver"};
 
   std::string algorithm;
   app.add_option("-a,--algorithm", algorithm, "Algorithm to use")->required();
 
-  rng_result_type seed;
+  int seed;
   app.add_option("-s,--seed", seed, "Seed for random generator")->required();
 
   double timeout;
@@ -45,19 +57,26 @@ int main(int argc, char** argv) {
   std::filesystem::path outdir;
   app.add_option("-o,--output-directory", outdir, "Output directory")->required();
 
+  int anytime_eps_l{100};
+  app.add_option("--anytime-eps-l", anytime_eps_l, "Parameter 'l' for anytime-eps algorithm", true);
+
+  queue_type queue_t{queue_type::FIFO};
+  app.add_option("--queue-type", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)", true)
+      ->transform(CLI::CheckedTransformer(
+          std::map<std::string, queue_type>{
+              {"fifo", queue_type::FIFO}, {"lifo", queue_type::LIFO}, {"random", queue_type::Random}},
+          CLI::ignore_case));
+
+  problem_order order{problem_order::Default};
+  app.add_option("--order", order, "Order for problem items", true)
+      ->transform(CLI::CheckedTransformer(std::map<std::string, problem_order>{{"default", problem_order::Default},
+                                                                               {"random", problem_order::Random},
+                                                                               {"rank_min", problem_order::RankMin},
+                                                                               {"rank_max", problem_order::RankMax},
+                                                                               {"rank_sum", problem_order::RankSum}},
+                                          CLI::ignore_case));
+
   CLI11_PARSE(app, argc, argv);
-
-  // if (argc < 6) {
-  //   fmt::print("Error: wrong number of arguments.\n");
-  //   fmt::print("Usage: {} algorithm timeout seed inputfile outdir.\n", argv[0]);
-  //   return EXIT_FAILURE;
-  // }
-
-  // auto algorithm = std::string(argv[1]);
-  // auto timeout = std::stod(argv[2]);
-  // auto seed = std::stoull(argv[3]);
-  // auto inputfile = argv[4];
-  // auto outdir = std::filesystem::path(argv[5]);
 
   using data_type = int_fast32_t;
   using dvec_type = std::vector<bool>;
@@ -66,30 +85,76 @@ int main(int argc, char** argv) {
 
   using hv_data_type = boost::multiprecision::int256_t;
 
-  using problem_type = mobkp::problem<data_type>;
+  using problem_type = mobkp::ordered_problem<mobkp::problem<data_type>>;
   using solution_type = mobkp::solution<problem_type, dvec_type, ovec_type, cvec_type>;
 
-  auto const problem = problem_type::from_stream(std::ifstream(inputfile));
-  // auto const ni = problem.num_items();
-  auto const no = problem.num_objectives();
-  // auto const nc = problem.num_constraints();
+  auto const orig_problem = mobkp::problem<data_type>::from_stream(std::ifstream(inputfile));
+  auto const ni = orig_problem.num_items();
+  auto const no = orig_problem.num_objectives();
 
+  auto seed_seq = std::seed_seq{seed};
   auto hvref = ovec_type(no, -1);
+
   auto anytime_trace = mobkp::anytime_trace(mooutils::incremental_hv<hv_data_type, ovec_type>(hvref));
+
+  std::vector<size_t> index_order;
+  switch (order) {
+    case problem_order::Default:
+      index_order.reserve(ni);
+      for (size_t i = 0; i < ni; ++i) {
+        index_order.emplace_back(i);
+      }
+      break;
+    case problem_order::Random:
+      index_order.reserve(ni);
+      for (size_t i = 0; i < ni; ++i) {
+        index_order.emplace_back(i);
+      }
+      {
+        auto rng = std::mt19937_64(seed_seq);
+        std::shuffle(index_order.begin(), index_order.end(), rng);
+      }
+      break;
+    case problem_order::RankMin:
+      index_order = mobkp::rank_min_order(orig_problem, mobkp::objectives_orders(orig_problem));
+      break;
+    case problem_order::RankMax:
+      index_order = mobkp::rank_max_order(orig_problem, mobkp::objectives_orders(orig_problem));
+      break;
+    case problem_order::RankSum:
+      index_order = mobkp::rank_sum_order(orig_problem, mobkp::objectives_orders(orig_problem));
+      break;
+  }
+
+  auto const problem = problem_type(orig_problem, index_order);
 
   auto solutions = mooutils::unordered_set<solution_type>();
 
   if (algorithm == "pls") {
     auto initial_solution = solution_type::empty(problem);
     anytime_trace.add_solution(0, initial_solution);
-
     solutions.insert_unchecked(std::move(initial_solution));
-
-    auto rng = std::mt19937_64(seed);  // std::random_device()());
-    auto queue = mooutils::random_queue<solution_type, decltype(rng)>(std::move(rng));
-    queue.push(*solutions.begin());
-
-    mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
+    switch (queue_t) {
+      case queue_type::FIFO: {
+        auto queue = mooutils::fifo_queue<solution_type>();
+        queue.push(*solutions.begin());
+        mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::LIFO: {
+        auto queue = mooutils::lifo_queue<solution_type>();
+        queue.push(*solutions.begin());
+        mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::Random: {
+        auto rng = std::mt19937_64(seed_seq);
+        auto queue = mooutils::random_queue<solution_type, decltype(rng)>(std::move(rng));
+        queue.push(*solutions.begin());
+        mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
+        break;
+      }
+    }
   } else if (algorithm == "nemull-dp") {
     solutions = mobkp::nemull_dp<solution_type>(problem, anytime_trace, timeout);
   } else if (algorithm == "bhv-dp") {
@@ -103,17 +168,45 @@ int main(int argc, char** argv) {
   } else if (algorithm == "aeps") {
     solutions = mobkp::aeps<solution_type>(problem, anytime_trace, timeout);
   } else if (algorithm == "anytime-eps") {
-    // TODO Make this a parameter
-    size_t l = 100;
-    solutions = mobkp::anytime_eps<solution_type>(problem, l, hvref, anytime_trace, timeout);
-  } else if (algorithm == "eager-branch-and-bound-dfs") {
-    // auto queue = mooutils::lifo_queue<solution_type>();
-    // auto sols = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
-    // for (auto&& s : sols) {
-    //   solutions.insert_unchecked(std::move(s));
-    // }
-  } else if (algorithm == "eager-branch-and-bound-bfs") {
-  } else if (algorithm == "lazy-branch-and-bound") {
+    solutions = mobkp::anytime_eps<solution_type>(problem, anytime_eps_l, hvref, anytime_trace, timeout);
+  } else if (algorithm == "eager-bb") {
+    switch (queue_t) {
+      case queue_type::FIFO: {
+        auto queue = mooutils::fifo_queue<mobkp::bbdetails::node<solution_type>>();
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::LIFO: {
+        auto queue = mooutils::lifo_queue<mobkp::bbdetails::node<solution_type>>();
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::Random: {
+        auto rng = std::mt19937_64(seed_seq);
+        auto queue = mooutils::random_queue<mobkp::bbdetails::node<solution_type>, decltype(rng)>(std::move(rng));
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+    }
+  } else if (algorithm == "lazy-bb") {
+    switch (queue_t) {
+      case queue_type::FIFO: {
+        auto queue = mooutils::fifo_queue<mobkp::bbdetails::node<solution_type>>();
+        solutions = mobkp::lazy_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::LIFO: {
+        auto queue = mooutils::lifo_queue<mobkp::bbdetails::node<solution_type>>();
+        solutions = mobkp::lazy_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::Random: {
+        auto rng = std::mt19937_64(seed_seq);
+        auto queue = mooutils::random_queue<mobkp::bbdetails::node<solution_type>, decltype(rng)>(std::move(rng));
+        solutions = mobkp::lazy_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+    }
   } else {
     fmt::print("Error: unknown algorithm.\n");
     return EXIT_FAILURE;
@@ -161,19 +254,23 @@ int main(int argc, char** argv) {
   for (auto const& s : solutions) {
     fmt::print(solution_stream, "{} ", fmt::join(s.objective_vector(), " "));
     fmt::print(solution_stream, "{} ", fmt::join(s.constraint_vector(), " "));
-    fmt::print(solution_stream, "{:d}\n", fmt::join(s.decision_vector(), " "));
+    std::vector<bool> dvec(ni, false);
+    for (size_t i = 0; i < ni; ++i) {
+      dvec[index_order[i]] = s.decision_vector()[i];
+    }
+    fmt::print(solution_stream, "{:d}\n", fmt::join(dvec, " "));
   }
   solution_stream.close();
 
   // Print problem.dat useful to validate solutions
   auto problem_stream = std::ofstream(outdir / "problem.dat");
-  fmt::print(problem_stream, "{}\n", problem.num_items());
-  fmt::print(problem_stream, "{}\n", problem.num_objectives());
-  fmt::print(problem_stream, "{}\n", problem.num_constraints());
-  fmt::print(problem_stream, "{}\n", fmt::join(problem.weight_capacities(), " "));
-  for (size_t i = 0; i < problem.num_items(); ++i) {
-    fmt::print(problem_stream, "{} ", fmt::join(problem.item_values(i), " "));
-    fmt::print(problem_stream, "{}\n", fmt::join(problem.item_weights(i), " "));
+  fmt::print(problem_stream, "{}\n", orig_problem.num_items());
+  fmt::print(problem_stream, "{}\n", orig_problem.num_objectives());
+  fmt::print(problem_stream, "{}\n", orig_problem.num_constraints());
+  fmt::print(problem_stream, "{}\n", fmt::join(orig_problem.weight_capacities(), " "));
+  for (size_t i = 0; i < orig_problem.num_items(); ++i) {
+    fmt::print(problem_stream, "{} ", fmt::join(orig_problem.item_values(i), " "));
+    fmt::print(problem_stream, "{}\n", fmt::join(orig_problem.item_weights(i), " "));
   }
   problem_stream.close();
 

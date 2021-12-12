@@ -42,7 +42,7 @@ template <typename Solution, typename ObjectivesOrders>
           auto lasti = orders[i][j - 1];
           auto nexti = orders[i][j + 1];
           auto b1 = (remw * p.get().item_value(nexti, i)) / p.get().item_weight(nexti, 0);
-          auto b2 = vk + (remw * p.get().item_value(lasti, i)) / p.get().item_weight(lasti, 0);
+          auto b2 = vk - ((wk - remw) * p.get().item_value(lasti, i)) / p.get().item_weight(lasti, 0);
           rem = std::max(b1, b2);
         } else {
           // This gives Dantzig's remainder

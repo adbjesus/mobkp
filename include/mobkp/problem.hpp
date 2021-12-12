@@ -1,6 +1,8 @@
 #ifndef MOBKP_PROBLEM_HPP_
 #define MOBKP_PROBLEM_HPP_
 
+#include "orders.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -24,9 +26,7 @@ class problem {
       , m_data(std::move(data)) {}
 
   // Assumes data is in the form (whitespace irrelevant):
-  //   n
-  //   no
-  //   nc
+  //   n no nc
   //   W_1 ... W_nc
   //   v^1_1 ... v^no_1 w^1_1 ... w^nc_1
   //   ...
@@ -119,6 +119,81 @@ class problem {
   const size_type m_no;         // number of values per item
   const size_type m_nc;         // number of constraints per item
   const container_type m_data;  // data container (constraints, and items)
+};
+
+// TODO use problem_base to avoid repetition
+template <typename Problem>
+class ordered_problem {
+ private:
+  using problem_type = Problem;
+
+ public:
+  using data_type = typename problem_type::data_type;
+  using container_type = typename problem_type::container_type;
+  using size_type = typename problem_type::size_type;
+
+  template <typename Order>
+  ordered_problem(problem_type const &problem, Order &&order)
+      : m_problem(problem)
+      , m_order(std::forward<Order>(order)) {}
+
+  constexpr auto num_items() const noexcept {
+    return m_problem.get().num_items();
+  }
+
+  constexpr auto num_objectives() const noexcept {
+    return m_problem.get().num_objectives();
+  }
+
+  constexpr auto num_constraints() const noexcept {
+    return m_problem.get().num_constraints();
+  }
+
+  // Get an iterator to constraint $j$ of item $i$.
+  [[nodiscard]] constexpr auto item_weight_it(size_type i, size_type j) const {
+    return m_problem.get().item_weight_it(m_order[i], j);
+  }
+
+  // Get constraint $j$ of item $i$.
+  [[nodiscard]] constexpr auto item_weight(size_type i, size_type j) const {
+    return *item_weight_it(i, j);
+  }
+
+  [[nodiscard]] constexpr auto item_weights(size_type i) const {
+    return std::span(item_weight_it(i, 0), num_constraints());
+  }
+
+  // Get an iterator to value $j$ of item $i$.
+  [[nodiscard]] constexpr auto item_value_it(size_type i, size_type j) const {
+    return m_problem.get().item_value_it(m_order[i], j);
+  }
+
+  // Get value $j$ for item $i$.
+  [[nodiscard]] constexpr auto item_value(size_type i, size_type j) const {
+    return *item_value_it(i, j);
+  }
+
+  [[nodiscard]] constexpr auto item_values(size_type i) const {
+    return std::span(item_value_it(i, 0), num_objectives());
+  }
+
+  // Get an iterator to weight capacity $i$.
+  [[nodiscard]] constexpr auto weight_capacity_it(size_type i) const {
+    return m_problem.get().weight_capacity_it(i);
+  }
+
+  // Get the value of weight capacity $i$.
+  [[nodiscard]] constexpr auto weight_capacity(size_type i) const {
+    return *weight_capacity_it(i);
+  }
+
+  [[nodiscard]] constexpr auto weight_capacities() const {
+    return m_problem.get().weight_capacities();
+  }
+
+ private:
+  std::reference_wrapper<const problem_type> m_problem;
+  std::vector<size_t> m_order;
 };
 
 }  // namespace mobkp

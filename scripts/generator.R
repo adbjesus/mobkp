@@ -45,7 +45,7 @@ stopifnot(c >= 0 && c <= 1)
 seed <- as.integer(args[6])
 set.seed(seed)
 
-generate_data <- function(n, m, rho1, rho2, seed = NULL, low = 1, high = 10000, wsize = 10000) {
+generate_data <- function(n, m, rho1, rho2, seed = NULL, low = 1, high = 1000, wsize = 1000) {
   set.seed(seed)
 
   rho1 <- 2 * sin(pi / 6 * rho1)

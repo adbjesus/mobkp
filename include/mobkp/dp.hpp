@@ -186,7 +186,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto orders = mobkp::objectives_orders(problem);
   auto order_max = mobkp::rank_max_order(problem, orders);
   auto order_sum = mobkp::rank_sum_order(problem, orders);
-  std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
   anytime_trace.add_solution(0, *sols.begin());
@@ -202,9 +201,8 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   }
 
-  for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
+  for (size_t i = 0; i < problem.num_items() && elapsed_sec() < timeout; ++i) {
     // std::cerr << ind << " " << sols.size() << "\n";
-    auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
     remove_from_order(order_max, i);
@@ -292,7 +290,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto orders = mobkp::objectives_orders(problem);
   auto order_max = mobkp::rank_max_order(problem, orders);
   auto order_sum = mobkp::rank_sum_order(problem, orders);
-  std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
   if (lb.insert(*sols.begin()) != lb.end())
@@ -309,9 +306,8 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   }
 
-  for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
+  for (size_t i = 0; i < problem.num_items() && elapsed_sec() < timeout; ++i) {
     // std::cerr << ind << " " << sols.size() << "\n";
-    auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
     remove_from_order(order_max, i);
@@ -396,7 +392,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto orders = mobkp::objectives_orders(problem);
   auto order_max = mobkp::rank_max_order(problem, orders);
   auto order_sum = mobkp::rank_sum_order(problem, orders);
-  std::vector<size_t> sorted_items(order_max.begin(), order_max.end());
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
   anytime_trace.add_solution(0, *sols.begin());
@@ -435,9 +430,8 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   }
 
-  for (size_t ind = 0; ind < problem.num_items() && elapsed_sec() < timeout; ++ind) {
+  for (size_t i = 0; i < problem.num_items() && elapsed_sec() < timeout; ++i) {
     // std::cerr << ind << " " << sols.size() << "\n";
-    auto i = sorted_items[ind];
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
     remove_from_order(order_max, i);

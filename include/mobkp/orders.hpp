@@ -83,6 +83,25 @@ template <typename Problem, typename ObjectivesOrders>
   return order_rank_sum;
 }
 
+// TODO be more careful with potential overflow
+template <typename Problem>
+[[nodiscard]] constexpr auto ratio_sum_order(Problem const& problem) {
+  std::vector<int_fast64_t> values_sum(problem.num_items(), 0);
+  for (size_t i = 0; i < problem.num_items(); ++i) {
+    for (size_t j = 0; j < problem.num_objectives(); ++j) {
+      values_sum[i] += problem.item_value(i, j);
+    }
+  }
+  std::vector<size_t> order_ratio_sum(problem.num_items());
+  for (size_t j = 0; j < problem.num_items(); ++j) {
+    order_ratio_sum[j] = j;
+  }
+  std::sort(order_ratio_sum.begin(), order_ratio_sum.end(), [&values_sum, &problem](auto const& lhs, auto const& rhs) {
+    return values_sum[lhs] * problem.item_weight(rhs, 0) > values_sum[rhs] * problem.item_weight(lhs, 0);
+  });
+  return order_ratio_sum;
+}
+
 }  // namespace mobkp
 
 #endif  // MOBKP_ORDERS_HPP_

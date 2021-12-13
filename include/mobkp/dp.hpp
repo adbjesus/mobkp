@@ -282,7 +282,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   }
 
   auto lb = mooutils::set<solution_type>();
-  // auto fk_at = fake_anytime_trace();
   for (auto&& s : dws<solution_type>(problem, anytime_trace, timeout)) {
     lb.insert_unchecked(std::move(s));
   }

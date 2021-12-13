@@ -30,60 +30,37 @@ class anytime_trace {
     }
   }
 
-  auto elapsed() -> duration_type {
+  [[nodiscard]] constexpr auto elapsed() -> duration_type {
     return clock_type::now() - m_start;
   }
 
-  auto elapsed_sec() -> double {
+  [[nodiscard]] constexpr auto elapsed_sec() -> double {
     return std::chrono::duration<double>(elapsed()).count();
   }
 
-  auto begin() {
+  [[nodiscard]] constexpr auto begin() {
     return m_measures.begin();
   }
 
-  auto end() {
+  [[nodiscard]] constexpr auto begin() const {
+    return m_measures.begin();
+  }
+
+  [[nodiscard]] constexpr auto end() {
     return m_measures.end();
+  }
+
+  [[nodiscard]] constexpr auto end() const {
+    return m_measures.end();
+  }
+
+  [[nodiscard]] constexpr auto indicator_value() const {
+    return m_qi.value();
   }
 
  private:
   time_point_type m_start;
   incremental_indicator_type m_qi;
-  measures_container_type m_measures;
-};
-
-class fake_anytime_trace {
- public:
-  using clock_type = std::chrono::high_resolution_clock;
-  using time_point_type = std::chrono::time_point<clock_type>;
-  using duration_type = std::chrono::nanoseconds;
-  using iteration_type = size_t;
-  using measures_container_type = std::vector<int>;
-
-  fake_anytime_trace() {}
-
-  template <typename Solution>
-  auto add_solution([[maybe_unused]] iteration_type const& iteration,
-                    [[maybe_unused]] Solution&& solution) {}
-
-  auto elapsed() -> duration_type {
-    return clock_type::now() - m_start;
-  }
-
-  auto elapsed_sec() -> double {
-    return std::chrono::duration<double>(elapsed()).count();
-  }
-
-  auto begin() {
-    return m_measures.begin();
-  }
-
-  auto end() {
-    return m_measures.end();
-  }
-
- private:
-  time_point_type m_start;
   measures_container_type m_measures;
 };
 

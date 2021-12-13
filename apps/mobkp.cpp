@@ -29,6 +29,10 @@ enum class queue_type {
   FIFO,
   LIFO,
   Random,
+  HypervolumeBeFS,
+  HypervolumeBeDFS,
+  EpsilonBeFS,
+  EpsilonBeDFS,
 };
 
 enum class problem_order {
@@ -62,10 +66,14 @@ int main(int argc, char** argv) {
 
   queue_type queue_t{queue_type::FIFO};
   app.add_option("--queue-type", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)", true)
-      ->transform(CLI::CheckedTransformer(
-          std::map<std::string, queue_type>{
-              {"fifo", queue_type::FIFO}, {"lifo", queue_type::LIFO}, {"random", queue_type::Random}},
-          CLI::ignore_case));
+      ->transform(CLI::CheckedTransformer(std::map<std::string, queue_type>{{"fifo", queue_type::FIFO},
+                                                                            {"lifo", queue_type::LIFO},
+                                                                            {"random", queue_type::Random},
+                                                                            {"hv_befs", queue_type::HypervolumeBeFS},
+                                                                            {"hv_bedfs", queue_type::HypervolumeBeDFS},
+                                                                            {"eps_befs", queue_type::EpsilonBeFS},
+                                                                            {"eps_bedfs", queue_type::EpsilonBeDFS}},
+                                          CLI::ignore_case));
 
   problem_order order{problem_order::Default};
   app.add_option("--order", order, "Order for problem items", true)
@@ -75,6 +83,15 @@ int main(int argc, char** argv) {
                                                                                {"rank_max", problem_order::RankMax},
                                                                                {"rank_sum", problem_order::RankSum}},
                                           CLI::ignore_case));
+
+  size_t anytime_bb_k{100};
+  app.add_option("--anytime-bb-k", anytime_bb_k, "Parameter 'k' for anytime-bb algorithm", true);
+
+  double anytime_bb_delta{1e-6};
+  app.add_option("--anytime-bb-delta", anytime_bb_delta, "Parameter 'delta' for anytime-bb algorithm", true);
+
+  size_t anytime_bb_l{100};
+  app.add_option("--anytime-bb-l", anytime_bb_l, "Parameter 'l' for anytime-bb algorithm", true);
 
   CLI11_PARSE(app, argc, argv);
 
@@ -154,6 +171,8 @@ int main(int argc, char** argv) {
         mobkp::flip_exchange_pls(problem, solutions, queue, anytime_trace, timeout);
         break;
       }
+      default:
+        throw("Queue not implemented for 'pls' algorithm");
     }
   } else if (algorithm == "nemull-dp") {
     solutions = mobkp::nemull_dp<solution_type>(problem, anytime_trace, timeout);
@@ -187,6 +206,32 @@ int main(int argc, char** argv) {
         solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
         break;
       }
+      case queue_type::HypervolumeBeFS: {
+        auto hvobject = mooutils::incremental_hv<hv_data_type, ovec_type>(hvref);
+        auto queue =
+            mobkp::bbdetails::hypervolume_befs_queue<mobkp::bbdetails::node<solution_type>, decltype(hvobject)>(
+                std::move(hvobject));
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::HypervolumeBeDFS: {
+        auto hvobject = mooutils::incremental_hv<hv_data_type, ovec_type>(hvref);
+        auto queue =
+            mobkp::bbdetails::hypervolume_bedfs_queue<mobkp::bbdetails::node<solution_type>, decltype(hvobject)>(
+                std::move(hvobject));
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::EpsilonBeFS: {
+        auto queue = mobkp::bbdetails::epsilon_befs_queue<mobkp::bbdetails::node<solution_type>>(no);
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::EpsilonBeDFS: {
+        auto queue = mobkp::bbdetails::epsilon_bedfs_queue<mobkp::bbdetails::node<solution_type>>(no);
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
     }
   } else if (algorithm == "lazy-bb") {
     switch (queue_t) {
@@ -206,7 +251,37 @@ int main(int argc, char** argv) {
         solutions = mobkp::lazy_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
         break;
       }
+      case queue_type::HypervolumeBeFS: {
+        auto hvobject = mooutils::incremental_hv<hv_data_type, ovec_type>(hvref);
+        auto queue =
+            mobkp::bbdetails::hypervolume_befs_queue<mobkp::bbdetails::node<solution_type>, decltype(hvobject)>(
+                std::move(hvobject));
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::HypervolumeBeDFS: {
+        auto hvobject = mooutils::incremental_hv<hv_data_type, ovec_type>(hvref);
+        auto queue =
+            mobkp::bbdetails::hypervolume_bedfs_queue<mobkp::bbdetails::node<solution_type>, decltype(hvobject)>(
+                std::move(hvobject));
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::EpsilonBeFS: {
+        auto queue = mobkp::bbdetails::epsilon_befs_queue<mobkp::bbdetails::node<solution_type>>(no);
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
+      case queue_type::EpsilonBeDFS: {
+        auto queue = mobkp::bbdetails::epsilon_bedfs_queue<mobkp::bbdetails::node<solution_type>>(no);
+        solutions = mobkp::eager_branch_and_bound<solution_type>(problem, queue, anytime_trace, timeout);
+        break;
+      }
     }
+  } else if (algorithm == "anytime-bb") {
+    auto hvobject = mooutils::incremental_hv<hv_data_type, ovec_type>(hvref);
+    solutions = mobkp::anytime_branch_and_bound<solution_type>(problem, anytime_trace, std::move(hvobject), timeout,
+                                                               anytime_bb_k, anytime_bb_delta, anytime_bb_l);
   } else {
     fmt::print("Error: unknown algorithm.\n");
     return EXIT_FAILURE;

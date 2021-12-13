@@ -692,7 +692,6 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
             std::get<3>(queue_v).push(std::move(node));
           }
         }
-        std::cerr << "PHASE 1\n";
         phase = 1;
       }
     } else if (phase == 1) {
@@ -718,7 +717,6 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
         for (auto& node : nodes) {
           std::get<2>(queue_v).push(std::move(node));
         }
-        std::cerr << "PHASE 2\n";
         phase = 2;
       }
     }

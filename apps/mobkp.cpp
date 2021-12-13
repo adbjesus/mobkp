@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
   app.add_option("--anytime-eps-l", anytime_eps_l, "Parameter 'l' for anytime-eps algorithm", true);
 
   queue_type queue_t{queue_type::FIFO};
-  app.add_option("--queue-type", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)", true)
+  app.add_option("--queue", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)", true)
       ->transform(CLI::CheckedTransformer(std::map<std::string, queue_type>{{"fifo", queue_type::FIFO},
                                                                             {"lifo", queue_type::LIFO},
                                                                             {"random", queue_type::Random},
@@ -90,10 +90,12 @@ int main(int argc, char** argv) {
   double anytime_bb_delta{1e-6};
   app.add_option("--anytime-bb-delta", anytime_bb_delta, "Parameter 'delta' for anytime-bb algorithm", true);
 
-  size_t anytime_bb_l{100};
+  size_t anytime_bb_l{100000};
   app.add_option("--anytime-bb-l", anytime_bb_l, "Parameter 'l' for anytime-bb algorithm", true);
 
   CLI11_PARSE(app, argc, argv);
+
+  std::cout << app.config_to_str(true, true);
 
   using data_type = int_fast32_t;
   using dvec_type = std::vector<bool>;

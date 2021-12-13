@@ -45,6 +45,7 @@ enum class problem_order {
 
 int main(int argc, char** argv) {
   CLI::App app{"Multi-Objective Binary Knapsack Solver"};
+  app.option_defaults()->always_capture_default();
 
   std::string algorithm;
   app.add_option("-a,--algorithm", algorithm, "Algorithm to use")->required();
@@ -62,10 +63,10 @@ int main(int argc, char** argv) {
   app.add_option("-o,--output-directory", outdir, "Output directory")->required();
 
   int anytime_eps_l{100};
-  app.add_option("--anytime-eps-l", anytime_eps_l, "Parameter 'l' for anytime-eps algorithm", true);
+  app.add_option("--anytime-eps-l", anytime_eps_l, "Parameter 'l' for anytime-eps algorithm");
 
   queue_type queue_t{queue_type::FIFO};
-  app.add_option("--queue", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)", true)
+  app.add_option("--queue", queue_t, "Queue type for algorithms that require a queue (e.g. pls and b&b)")
       ->transform(CLI::CheckedTransformer(std::map<std::string, queue_type>{{"fifo", queue_type::FIFO},
                                                                             {"lifo", queue_type::LIFO},
                                                                             {"random", queue_type::Random},
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
                                           CLI::ignore_case));
 
   problem_order order{problem_order::Default};
-  app.add_option("--order", order, "Order for problem items", true)
+  app.add_option("--order", order, "Order for problem items")
       ->transform(CLI::CheckedTransformer(std::map<std::string, problem_order>{{"default", problem_order::Default},
                                                                                {"random", problem_order::Random},
                                                                                {"rank_min", problem_order::RankMin},
@@ -85,13 +86,13 @@ int main(int argc, char** argv) {
                                           CLI::ignore_case));
 
   size_t anytime_bb_k{100};
-  app.add_option("--anytime-bb-k", anytime_bb_k, "Parameter 'k' for anytime-bb algorithm", true);
+  app.add_option("--anytime-bb-k", anytime_bb_k, "Parameter 'k' for anytime-bb algorithm");
 
   double anytime_bb_delta{1e-6};
-  app.add_option("--anytime-bb-delta", anytime_bb_delta, "Parameter 'delta' for anytime-bb algorithm", true);
+  app.add_option("--anytime-bb-delta", anytime_bb_delta, "Parameter 'delta' for anytime-bb algorithm");
 
   size_t anytime_bb_l{100000};
-  app.add_option("--anytime-bb-l", anytime_bb_l, "Parameter 'l' for anytime-bb algorithm", true);
+  app.add_option("--anytime-bb-l", anytime_bb_l, "Parameter 'l' for anytime-bb algorithm");
 
   CLI11_PARSE(app, argc, argv);
 

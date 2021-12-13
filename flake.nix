@@ -21,7 +21,6 @@
             pkgs.glpk
             pkgs.fmt_8
             pkgs.catch2
-            pkgs.cli11
             pkgs.boost175
             mooutils.packages.${system}.mooutils
             apm.packages.${system}.apm

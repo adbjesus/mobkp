@@ -279,7 +279,7 @@ class epsilon_befs_queue : public mooutils::base_queue<epsilon_befs_queue<Node, 
 
   struct HeapCmp {
     auto operator()(auto const& a, auto const& b) const -> bool {
-      return std::get<1>(a) < std::get<1>(b);
+      return std::get<1>(a) > std::get<1>(b);
     }
   };
 

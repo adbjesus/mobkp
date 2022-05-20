@@ -20,7 +20,7 @@ namespace bbdetails {
 
 template <typename Solution, typename ObjectiveOrdersList = std::vector<std::vector<std::vector<size_t>>>,
           typename RatioSumOrderList = std::vector<std::vector<size_t>>>
-struct node {
+class node {
  public:
   using solution_type = Solution;
   using objective_orders_list = ObjectiveOrdersList;
@@ -106,11 +106,12 @@ class hypervolume_befs_queue
 
  public:
   using node_type = Node;
+  using container_type = Container;
   using hypervolume_type = Hypervolume;
   using hypervolume_value_type = typename hypervolume_type::value_type;
 
   template <typename... Args>
-  explicit hypervolume_befs_queue(Args&&... args, hypervolume_type&& hv_object)
+  explicit hypervolume_befs_queue(hypervolume_type&& hv_object, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_hv_object(std::move(hv_object)) {}
 
@@ -215,11 +216,12 @@ class hypervolume_bedfs_queue
     : public mooutils::base_queue<hypervolume_bedfs_queue<Node, Hypervolume, Container>, Node, Container> {
  public:
   using node_type = Node;
+  using container_type = Container;
   using hypervolume_type = Hypervolume;
   using hypervolume_value_type = typename hypervolume_type::value_type;
 
   template <typename... Args>
-  explicit hypervolume_bedfs_queue(Args&&... args, hypervolume_type&& hv_object)
+  explicit hypervolume_bedfs_queue(hypervolume_type&& hv_object, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_hv_object(std::move(hv_object)) {}
 
@@ -272,6 +274,18 @@ class hypervolume_bedfs_queue
   hypervolume_type m_hv_object;
 };
 
+[[nodiscard]] constexpr auto eps_ref(auto const& v, auto const& ref) {
+  double res = 0;
+  for (std::size_t i = 0; i < ref.size(); ++i) {
+    if (ref[i] == 0) {
+      return std::numeric_limits<double>::max();
+    } else {
+      res = std::max(res, static_cast<double>(ref[i]) / static_cast<double>(v[i]));
+    }
+  }
+  return res;
+};
+
 template <typename Node, typename Container = std::vector<std::pair<Node, double>>>
 class epsilon_befs_queue : public mooutils::base_queue<epsilon_befs_queue<Node, Container>, Node, Container> {
  private:
@@ -285,19 +299,25 @@ class epsilon_befs_queue : public mooutils::base_queue<epsilon_befs_queue<Node, 
 
  public:
   using node_type = Node;
+  using container_type = Container;
+  using eps_point_type = std::vector<objective_value_type>;
 
   template <typename... Args>
-  explicit epsilon_befs_queue(Args&&... args, size_t no)
+  explicit epsilon_befs_queue(size_t no, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_support(no, static_cast<objective_value_type>(0)) {}
 
   template <typename... Args>
-  explicit epsilon_befs_queue(Args&&... args, std::vector<objective_value_type>&& eps_point)
+  explicit epsilon_befs_queue(eps_point_type&& eps_point, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_support(std::move(eps_point)) {}
 
   [[nodiscard]] constexpr auto nodes() {
     return std::views::all(this->c) | std::views::transform([](auto& v) -> node_type& { return std::get<0>(v); });
+  }
+
+  [[nodiscard]] constexpr auto eps_point() -> eps_point_type& {
+    return m_support;
   }
 
  private:
@@ -342,18 +362,10 @@ class epsilon_befs_queue : public mooutils::base_queue<epsilon_befs_queue<Node, 
   }
 
   [[nodiscard]] constexpr auto m_eps(auto const& v) const {
-    double res = 0;
-    for (std::size_t i = 0; i < m_support.size(); ++i) {
-      if (m_support[i] == 0) {
-        return std::numeric_limits<double>::max();
-      } else {
-        res = std::max(res, static_cast<double>(m_support[i]) / static_cast<double>(v[i]));
-      }
-    }
-    return res;
+    return eps_ref(v, m_support);
   };
 
-  std::vector<objective_value_type> m_support;
+  eps_point_type m_support;
   bool m_support_changed = false;
 };
 
@@ -364,19 +376,25 @@ class epsilon_bedfs_queue : public mooutils::base_queue<epsilon_bedfs_queue<Node
 
  public:
   using node_type = Node;
+  using container_type = Container;
+  using eps_point_type = std::vector<objective_value_type>;
 
   template <typename... Args>
-  explicit epsilon_bedfs_queue(Args&&... args, size_t no)
+  explicit epsilon_bedfs_queue(size_t no, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_support(no, static_cast<objective_value_type>(0)) {}
 
   template <typename... Args>
-  explicit epsilon_bedfs_queue(Args&&... args, std::vector<objective_value_type>&& eps_point)
+  explicit epsilon_bedfs_queue(eps_point_type&& eps_point, Args&&... args)
       : base_class_type(std::forward<Args>(args)...)
       , m_support(std::move(eps_point)) {}
 
   [[nodiscard]] constexpr auto nodes() {
     return std::views::all(this->c);
+  }
+
+  [[nodiscard]] constexpr auto eps_point() -> eps_point_type& {
+    return m_support;
   }
 
  private:
@@ -419,18 +437,10 @@ class epsilon_bedfs_queue : public mooutils::base_queue<epsilon_bedfs_queue<Node
   };
 
   [[nodiscard]] constexpr auto m_eps(auto const& v) const {
-    double res = 0;
-    for (std::size_t i = 0; i < m_support.size(); ++i) {
-      if (m_support[i] == 0) {
-        return std::numeric_limits<double>::max();
-      } else {
-        res = std::max(res, static_cast<double>(m_support[i]) / static_cast<double>(v[i]));
-      }
-    }
-    return res;
+    return eps_ref(v, m_support);
   };
 
-  std::vector<objective_value_type> m_support;
+  eps_point_type m_support;
 };
 
 }  // namespace bbdetails
@@ -615,7 +625,6 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
     remove_from_orders(objectives_orders, i);
     remove_from_order(ratio_sum_order, i);
   }
-
   auto update_lb_and_trace = [&lb, &anytime_trace, &iteration](auto& node) {
     for (auto& s : node.lower_bound()) {
       auto it = lb.insert(s);
@@ -631,11 +640,18 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
 
   using node_type = bbdetails::node<solution_type>;
   using hv_object_type = std::remove_cvref_t<decltype(hvobj)>;
+  using queue0_t = mooutils::lifo_queue<node_type>;
   using queue1_t = bbdetails::hypervolume_bedfs_queue<node_type, hv_object_type>;
   using queue2_t = bbdetails::hypervolume_befs_queue<node_type, hv_object_type>;
   using queue3_t = bbdetails::epsilon_bedfs_queue<bbdetails::node<solution_type>>;
   using queue4_t = bbdetails::epsilon_befs_queue<bbdetails::node<solution_type>>;
-  std::variant<queue1_t, queue2_t, queue3_t, queue4_t> queue_v(std::in_place_index<0>, std::move(hvobj));
+  std::variant<queue0_t, queue1_t, queue2_t, queue3_t, queue4_t> queue_v;
+
+  if (no <= 3) {
+    queue_v.template emplace<1>(std::move(hvobj));
+  } else {
+    queue_v.template emplace<3>(typename queue3_t::eps_point_type(no, 0));
+  }
 
   auto queue_v_empty = [&queue_v]() -> bool {
     return std::visit([](auto&& arg) -> bool { return arg.empty(); }, queue_v);
@@ -651,7 +667,7 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
 
   queue_v_push(std::move(empty));
 
-  int phase = 0;
+  // Phase 1 - HV BeDFS if no <= 3, or Eps BeDFS otherwise
   std::vector<double> qualities(k, 0.0);
   for (iteration = 1; !queue_v_empty() && elapsed_sec() < timeout; ++iteration) {
     // if (iteration % 1000 == 0) {
@@ -664,63 +680,86 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
         queue_v_push(std::move(branch));
       }
     }
-    if (phase == 0) {
-      double quality = static_cast<double>(anytime_trace.indicator_value());
-      double relative_quality = (quality - qualities[iteration % k]) / quality;
-      qualities[iteration % k] = quality;
-      if (relative_quality < delta) {
-        auto nodes = std::vector<node_type>{};
-        for (auto& node : std::get<0>(queue_v).nodes()) {
-          nodes.emplace_back(std::move(node));
-        }
-        if (no < 4) {
-          auto hvobj = std::move(std::get<0>(queue_v).hv_object());
-          queue_v.template emplace<1>(std::move(hvobj));
-          for (auto& node : nodes) {
-            std::get<1>(queue_v).push(std::move(node));
-          }
-        } else {
-          using objective_value_type = typename solution_type::objective_vector_type::value_type;
-          auto eps_point = std::vector<objective_value_type>(no, 0);
-          for (auto const& s : lb) {
-            for (size_t i = 0; i < no; ++i) {
-              eps_point[i] = std::max(eps_point[i], s.objective_vector()[i]);
-            }
-          }
-          queue_v.template emplace<3>(std::move(eps_point));
-          for (auto& node : nodes) {
-            std::get<3>(queue_v).push(std::move(node));
-          }
-        }
-        phase = 1;
+    double quality = static_cast<double>(anytime_trace.indicator_value());
+    double relative_quality = (quality - qualities[iteration % k]) / quality;
+    qualities[iteration % k] = quality;
+    if (relative_quality < delta) {
+      break;
+    }
+  }
+
+  // Change to phase 2, change to HV BeFS if no <= 2, otherwise change to Eps BeFS
+  if (no <= 2) {
+    auto hvobj = std::move(std::get<1>(queue_v).hv_object());
+    auto nodes = std::vector<node_type>{};
+    auto container = typename queue2_t::container_type{};
+    container.reserve(nodes.size());
+    for (auto& node : std::get<1>(queue_v).nodes()) {
+      container.emplace_back(std::move(node), hvobj.contribution(node.upper_bound()), 0);
+    }
+    queue_v.template emplace<2>(std::move(hvobj), std::move(container));
+  } else if (no == 3) {
+    auto eps_point = typename queue4_t::eps_point_type(no, 0);
+    for (auto const& s : lb) {
+      for (size_t i = 0; i < no; ++i) {
+        eps_point[i] = std::max(eps_point[i], s.objective_vector()[i]);
       }
-    } else if (phase == 1) {
-      if (std::visit([](auto&& arg) -> size_t { return arg.size(); }, queue_v) >= l) {
-        auto nodes = std::vector<node_type>{};
-        if (no < 4) {
-          for (auto& node : std::get<1>(queue_v).nodes()) {
-            nodes.emplace_back(std::move(node));
-          }
-        } else {
-          for (auto& node : std::get<3>(queue_v).nodes()) {
-            nodes.emplace_back(std::move(node));
-          }
-        }
-        using objective_value_type = typename solution_type::objective_vector_type::value_type;
-        auto eps_point = std::vector<objective_value_type>(no, 0);
-        for (auto const& s : lb) {
-          for (size_t i = 0; i < no; ++i) {
-            eps_point[i] = std::max(eps_point[i], s.objective_vector()[i]);
-          }
-        }
-        queue_v.template emplace<2>(std::move(eps_point));
-        for (auto& node : nodes) {
-          std::get<2>(queue_v).push(std::move(node));
-        }
-        phase = 2;
+    }
+    auto nodes = std::vector<node_type>{};
+    auto container = typename queue4_t::container_type{};
+    container.reserve(nodes.size());
+    for (auto& node : std::get<1>(queue_v).nodes()) {
+      container.emplace_back(std::move(node), mobkp::bbdetails::eps_ref(node.upper_bound(), eps_point));
+    }
+    queue_v.template emplace<4>(std::move(eps_point), std::move(container));
+  } else {
+    auto eps_point = std::move(std::get<3>(queue_v).eps_point());
+    auto nodes = std::vector<node_type>{};
+    auto container = typename queue4_t::container_type{};
+    container.reserve(nodes.size());
+    for (auto& node : std::get<3>(queue_v).nodes()) {
+      container.emplace_back(std::move(node), mobkp::bbdetails::eps_ref(node.upper_bound(), eps_point));
+    }
+    queue_v.template emplace<4>(std::move(eps_point), std::move(container));
+  }
+
+  for (++iteration; !queue_v_empty() && elapsed_sec() < timeout; ++iteration) {
+    // if (iteration % 1000 == 0) {
+    //   std::cerr << iteration << " " << queue.size() << " " << lb.size() << "\n";
+    // }
+    auto node = queue_v_pop();
+    for (auto& branch : std::move(node).branches()) {
+      if (!mooutils::strictly_dominates(lb, branch.upper_bound())) {
+        update_lb_and_trace(branch);
+        queue_v_push(std::move(branch));
       }
     }
   }
+
+  // // Change to phase 3, change to HV BeDFS if no <= 2, otherwise change to Eps BeDFS
+  // if (std::visit([](auto&& arg) -> size_t { return arg.size(); }, queue_v) >= l) {
+  //   auto nodes = std::vector<node_type>{};
+  //   if (no < 4) {
+  //     for (auto& node : std::get<1>(queue_v).nodes()) {
+  //       nodes.emplace_back(std::move(node));
+  //     }
+  //   } else {
+  //     for (auto& node : std::get<3>(queue_v).nodes()) {
+  //       nodes.emplace_back(std::move(node));
+  //     }
+  //   }
+  //   using objective_value_type = typename solution_type::objective_vector_type::value_type;
+  //   auto eps_point = std::vector<objective_value_type>(no, 0);
+  //   for (auto const& s : lb) {
+  //     for (size_t i = 0; i < no; ++i) {
+  //       eps_point[i] = std::max(eps_point[i], s.objective_vector()[i]);
+  //     }
+  //   }
+  //   queue_v.template emplace<2>(std::move(eps_point));
+  //   for (auto& node : nodes) {
+  //     std::get<2>(queue_v).push(std::move(node));
+  //   }
+  // }
 
   auto res = mooutils::unordered_set<solution_type>{};
   for (auto& s : lb) {

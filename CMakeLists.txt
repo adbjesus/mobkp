@@ -82,7 +82,7 @@ if (NOT mooutils_FOUND)
   include(FetchContent)
   FetchContent_Declare(
     mooutils
-    GIT_REPOSITORY git@git.adbjesus.com:mooutils.git
+    GIT_REPOSITORY https://github.com/adbjesus/mooutils.git
   )
   FetchContent_MakeAvailable(mooutils)
   add_library(mooutils::mooutils ALIAS mooutils)
@@ -94,7 +94,7 @@ if (NOT apm_FOUND)
   include(FetchContent)
   FetchContent_Declare(
     apm
-    GIT_REPOSITORY git@github.com:adbjesus/apm.git
+    GIT_REPOSITORY https://github.com/adbjesus/apm.git
   )
   FetchContent_MakeAvailable(apm)
   add_library(apm::apm ALIAS apm)

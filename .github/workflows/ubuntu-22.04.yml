@@ -1,0 +1,44 @@
+name: ubuntu-22.04
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Prepare environment
+      run: |
+        sudo apt-get install -y \
+          ninja-build \
+          catch2 \
+          doxygen \
+          libcli11-dev \
+          libfmt-dev \
+          libboost-all-dev \
+          libglpk-dev
+
+
+    - name: Configure CMake
+      run: |
+        cmake -B ${{github.workspace}}/build \
+              -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+              -DMOBKP_BUILD_APPS=ON \
+              -DMOBKP_BUILD_DOCS=ON \
+              -DMOBKP_BUILD_TESTS=ON \
+              -DMOBKP_BUILD_BENCHMARKS=ON \
+              -DMOBKP_ENABLE_WARNINGS=ON \
+              -DMOBKP_ENABLE_WERROR=ON \
+              -G Ninja
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build

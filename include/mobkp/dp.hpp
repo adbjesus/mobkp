@@ -263,10 +263,6 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 [[nodiscard]] constexpr auto fpsv_dp(Problem const& problem, AnytimeTrace& anytime_trace, double const timeout) {
   using solution_type = Solution;
 
-  auto elapsed_sec = [&anytime_trace]() {
-    return std::chrono::duration<double>(anytime_trace.elapsed()).count();
-  };
-
   auto remove_from_order = [](auto& order, size_t i) {
     std::erase(order, i);
   };
@@ -283,6 +279,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
 
   auto lb = mooutils::set<solution_type>();
   for (auto&& s : dws<solution_type>(problem, anytime_trace, timeout)) {
+    anytime_trace.add_solution(0, s);
     lb.insert_unchecked(std::move(s));
   }
 
@@ -291,8 +288,9 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
   auto order_sum = mobkp::rank_sum_order(problem, orders);
 
   auto sols = std::vector<solution_type>{solution_type::empty(problem)};
-  if (lb.insert(*sols.begin()) != lb.end())
+  if (lb.insert(*sols.begin()) != lb.end()) {
     anytime_trace.add_solution(0, *sols.begin());
+  }
 
   auto const& pc = problem.weight_capacities();
   auto rw = std::vector<typename Problem::data_type>(problem.num_constraints(), 0);
@@ -305,7 +303,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
     }
   }
 
-  for (size_t i = 0; i < problem.num_items() && elapsed_sec() < timeout; ++i) {
+  for (size_t i = 0; i < problem.num_items() && anytime_trace.elapsed_sec() < timeout; ++i) {
     // std::cerr << ind << " " << sols.size() << "\n";
     remove_from_orders(orders, i);
     remove_from_order(order_sum, i);
@@ -330,7 +328,7 @@ template <typename Solution, typename Problem, typename AnytimeTrace>
         }
       }
       if (lb.insert(tmp) != lb.end())
-        anytime_trace.add_solution(0, tmp);
+        anytime_trace.add_solution(i + 1, tmp);
       dpdetails::mantain_non_dominated(std::move(tmp), M, aux);
     }
     for (; k < sols.size(); ++k) {

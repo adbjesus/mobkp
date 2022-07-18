@@ -143,9 +143,9 @@ class hypervolume_befs_queue
       this->c.emplace_back(std::forward<T>(node), hvc, m_counter);
     } else if (m_no_update_counter == 10) {
       m_container_is_heap = true;
-      for (auto& [node, hvc, lastupdated] : this->c) {
+      for (auto& [qnode, hvc, lastupdated] : this->c) {
         if (lastupdated < m_counter) {
-          hvc = m_hv_object.contribution(node.upper_bound());
+          hvc = m_hv_object.contribution(qnode.upper_bound());
           lastupdated = m_counter;
         }
       }
@@ -342,13 +342,12 @@ class epsilon_befs_queue : public mooutils::base_queue<epsilon_befs_queue<Node, 
     auto eps = m_eps(node.upper_bound());
     if (m_support_changed) {
       this->c.emplace_back(std::forward<T>(node), eps);
-      for (auto& [node, eps] : this->c) {
-        eps = m_eps(node.upper_bound());
+      for (auto& [qnode, qeps] : this->c) {
+        qeps = m_eps(qnode.upper_bound());
       }
       std::ranges::make_heap(this->c, HeapCmp());
       m_support_changed = false;
     } else {
-      auto eps = m_eps(node.upper_bound());
       this->c.emplace_back(std::forward<T>(node), eps);
       std::ranges::push_heap(this->c, HeapCmp());
     }
@@ -589,7 +588,7 @@ template <typename Solution, typename Problem, typename Queue, typename AnytimeT
 template <typename Solution, typename Problem, typename HVObject, typename AnytimeTrace>
 [[nodiscard]] constexpr auto anytime_branch_and_bound(Problem const& problem, AnytimeTrace& anytime_trace,
                                                       HVObject&& hvobj, double timeout, size_t k, double delta,
-                                                      size_t l) {
+                                                      [[maybe_unused]] size_t l) {
   using solution_type = Solution;
 
   auto elapsed_sec = [&anytime_trace]() {
@@ -690,14 +689,14 @@ template <typename Solution, typename Problem, typename HVObject, typename Anyti
 
   // Change to phase 2, change to HV BeFS if no <= 2, otherwise change to Eps BeFS
   if (no <= 2) {
-    auto hvobj = std::move(std::get<1>(queue_v).hv_object());
+    auto newhvobj = std::move(std::get<1>(queue_v).hv_object());
     auto nodes = std::vector<node_type>{};
     auto container = typename queue2_t::container_type{};
     container.reserve(nodes.size());
     for (auto& node : std::get<1>(queue_v).nodes()) {
-      container.emplace_back(std::move(node), hvobj.contribution(node.upper_bound()), 0);
+      container.emplace_back(std::move(node), newhvobj.contribution(node.upper_bound()), 0);
     }
-    queue_v.template emplace<2>(std::move(hvobj), std::move(container));
+    queue_v.template emplace<2>(std::move(newhvobj), std::move(container));
   } else if (no == 3) {
     auto eps_point = typename queue4_t::eps_point_type(no, 0);
     for (auto const& s : lb) {

@@ -1,0 +1,32 @@
+{
+    "title": "mobkp",
+
+    "description": "Algorithms for the Multi-Objective Knapsack Problem (MOBKP)",
+
+    "keywords": [
+        "algorithms",
+        "multi-objective",
+        "optimization",
+        "knapsack"
+    ],
+
+    "upload_type": "software",
+
+    "license": "MIT",
+
+    "access_right": "open",
+
+    "creators": [
+        {
+            "orcid": "0000-0001-7691-0295",
+            "affiliation": "University of Coimbra",
+            "name": "Jesus, Alexandre D."
+        }
+    ],
+
+    "grants": [
+        {
+            "id": "10.13039/501100001871::SFRH/BD/132275/2017"
+        }
+    ]
+}

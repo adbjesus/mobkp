@@ -30,19 +30,20 @@
           src = self;
 
           meta = with nixpkgs.lib; {
-	    description = "Algorithms for the Multi-Objective Knapsack Problem (MOBKP)";
-	    license = licenses.mit;
-	  };
+            description = "Algorithms for the Multi-Objective Knapsack Problem (MOBKP)";
+            license = licenses.mit;
+          };
 
           nativeBuildInputs = with pkgs; [
-	    cmake
-	    ninja
-	  ];
+            cmake
+            ninja
+          ];
 
           buildInputs = [
             pkgs.glpk
             pkgs.fmt_8
             pkgs.boost175
+            pkgs.cli11
             mooutils.packages.${system}.mooutils
             apm.packages.${system}.apm
           ];
